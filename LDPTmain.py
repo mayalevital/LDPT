@@ -10,12 +10,12 @@ from dataset import RIDER_Dataset
 import u_net_torch
 from u_net_torch import Net
 from utilities import train_val_test_por
+from utilities import norm_data
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader, Subset
 from params import scan_params
-from U_net import Unet_model
 import os
 import torch.nn as nn
 import torch.optim as optim
@@ -46,34 +46,34 @@ trainloader_2 = torch.utils.data.DataLoader(val_set, batch_size=params['batch_si
                                             shuffle=True, num_workers=8)
 trainloader_3 = torch.utils.data.DataLoader(test_set, params['batch_size'],
                                             shuffle=True, num_workers=8)
-net = Net(params)
+net = Net(params).double()
 
 
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+criterion = nn.MSELoss()
+optimizer = optim.SGD(net.parameters(), lr=0.0002, momentum=0.9)
 
-for epoch in range(2):  # loop over the dataset multiple times
+
+for epoch in range(100):  # loop over the dataset multiple times
 
     running_loss = 0.0
     for i, data in enumerate(trainloader_1, 0):
         # get the inputs; data is a list of [inputs, labels]
-        inputs = data['LDPT']
-        labels = data['NDPT']
-        # zero the parameter gradients
+        inputs = norm_data(data['LDPT'].double())      
+        outputs = norm_data(data['NDPT'].double())
+                # zero the parameter gradients
         optimizer.zero_grad()
 
         # forward + backward + optimize
-        outputs = net(inputs)
-        loss = criterion(outputs, labels)
+        results = net(inputs)
+            
+        loss = criterion(results, outputs)
         loss.backward()
         optimizer.step()
 
         # print statistics
-        running_loss += loss.item()
-        if i % 2000 == 1999:    # print every 2000 mini-batches
-            print('[%d, %5d] loss: %.3f' %
-                  (epoch + 1, i + 1, running_loss / 2000))
-            running_loss = 0.0
+        running_loss = running_loss+ loss.item()
+    print('[%d, %5d] loss: %.3f' %
+                  (epoch + 1, i + 1, running_loss))
 
 print('Finished Training')
 

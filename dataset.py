@@ -29,7 +29,6 @@ plt.ion()   # interactive mode
 def get_mat(self, scan_idx,z_idx, mat_name):     
     name = os.path.join(self.root_dir,"phantom"+str(scan_idx),mat_name)
     mat = sio.loadmat(name)[mat_name][:,:,z_idx:z_idx+self.multi_slice_n]
-    print(mat.shape())
     return mat
 
 
@@ -57,9 +56,9 @@ class RIDER_Dataset(Dataset):
     def __getitem__(self,idx):
         scan_idx = math.floor(idx/(self.num_of_slices-self.multi_slice_n))+1
         z_idx = idx%(self.num_of_slices-self.multi_slice_n)+1
-        LDPT = rsz(get_mat(self, scan_idx, z_idx, "LD_PT"), (self.new_h, self.new_w))      
-        NDPT = get_mat(self, scan_idx, z_idx, "ND_PT")
-        SCCT = get_mat(self, scan_idx, z_idx, "SC_CT")
+        LDPT = np.moveaxis(rsz(get_mat(self, scan_idx, z_idx, "LD_PT"), (self.new_h, self.new_w), anti_aliasing=True),-1,0) 
+        NDPT = np.moveaxis(get_mat(self, scan_idx, z_idx, "ND_PT"),-1,0)
+        SCCT = np.moveaxis(get_mat(self, scan_idx, z_idx, "SC_CT"),-1,0)
         sample = {'LDPT': LDPT, 'NDPT': NDPT, 'SCCT': SCCT, 'scan_idx':scan_idx, 'z_idx':z_idx}
 
      

@@ -15,7 +15,7 @@ def scan_params():
     params['new_h'] = 128
     params['new_w']= 128  
     params['train_val_test'] = [5,2,2] #split of pt. between train_val_test
-    params['batch_size'] = 4
+    params['batch_size'] = 1
     params['ker_size'] = 3
     params['encoder_depth'] = [32,32,64]
     params['center_depth'] = [64]
