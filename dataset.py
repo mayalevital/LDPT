@@ -8,12 +8,13 @@ Created on Sun Mar 14 21:05:22 2021
 from __future__ import print_function, division
 import os
 import torch
-import pandas as pd
+#import pandas as pd
 from skimage import io, transform
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
+import torchvision.transforms.functional as TF
 import scipy.io as sio
 #import torchvision.transforms as transforms
 from skimage import data
@@ -23,12 +24,23 @@ from skimage.transform import resize as rsz
 import warnings
 warnings.filterwarnings("ignore")
 import math
-
+import torchio as tio
+import random
 plt.ion()   # interactive mode
+
+
+def transforma():
+    transforms = (tio.RandomFlip(axes=['LR', 'AP', 'IS']), tio.RandomBlur())
+    trans = tio.Compose(transforms)
+    
+    return trans
+
+
 
 def get_mat(self, scan_idx,z_idx, mat_name):     
     name = os.path.join(self.root_dir,"phantom"+str(scan_idx),mat_name)
     mat = sio.loadmat(name)[mat_name][:,:,z_idx:z_idx+self.multi_slice_n]
+    
     return mat
 
 
@@ -49,16 +61,40 @@ class RIDER_Dataset(Dataset):
         self.num_of_slices = params['num_of_slices']
         self.multi_slice_n = params['multi_slice_n']
         self.train_val_test = params['train_val_test']
-        
+        self.subject = tio.datasets.FPG()
+        self.transforms = transforma()
     def __len__(self):
         return self.length
 
     def __getitem__(self,idx):
         scan_idx = math.floor(idx/(self.num_of_slices-self.multi_slice_n))+1
         z_idx = idx%(self.num_of_slices-self.multi_slice_n)+1
-        LDPT = np.moveaxis(rsz(get_mat(self, scan_idx, z_idx, "LD_PT"), (self.new_h, self.new_w), anti_aliasing=True),-1,0) 
-        NDPT = np.moveaxis(get_mat(self, scan_idx, z_idx, "ND_PT"),-1,0)
-        SCCT = np.moveaxis(get_mat(self, scan_idx, z_idx, "SC_CT"),-1,0)
+        #trf = transforma(self)
+        #LDPT = trf(torch.tensor(rsz(get_mat(self, scan_idx, z_idx, "LD_PT"), (self.new_h, self.new_w), anti_aliasing=True)).unsqueeze(0))
+        #NDPT = trf(torch.tensor(get_mat(self, scan_idx, z_idx, "ND_PT")).unsqueeze(0))
+        #SCCT = trf(torch.tensor(get_mat(self, scan_idx, z_idx, "SC_CT")).unsqueeze(0))
+        LDPT = torch.tensor(rsz(get_mat(self, scan_idx, z_idx, "LD_PT"), (self.new_h, self.new_w), anti_aliasing=True)).unsqueeze(0)
+        NDPT = torch.tensor(get_mat(self, scan_idx, z_idx, "ND_PT")).unsqueeze(0)
+        SCCT = torch.tensor(get_mat(self, scan_idx, z_idx, "SC_CT")).unsqueeze(0)
+        seed = torch.randint(100,(1,)).data
+        random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        np.random.seed(seed)
+        LDPT = self.transforms(LDPT)
+        random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        np.random.seed(seed)
+        NDPT = self.transforms(NDPT)
+        random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        np.random.seed(seed)
+        SCCT = self.transforms(SCCT)
+
+
+        #print(NDPT.shape)
         sample = {'LDPT': LDPT, 'NDPT': NDPT, 'SCCT': SCCT, 'scan_idx':scan_idx, 'z_idx':z_idx}
 
      
