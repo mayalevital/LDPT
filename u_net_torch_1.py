@@ -124,7 +124,8 @@ class Net(nn.Module):
         fin_cen = upsamp(cen11)
         #decoder
         #stage1
-  
+        
+
         in_dec11 = torch.cat((enc31, fin_cen), dim=1)
         dec11 = F.relu(self.dec_conv11_bn(self.dec_conv11(in_dec11)))
         upsamp_size = (dec11.size()[2]*2, dec11.size()[2]*2, self.multi_slice_n)
