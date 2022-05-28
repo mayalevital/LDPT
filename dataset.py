@@ -8,47 +8,37 @@ Created on Sun Mar 14 21:05:22 2021
 from __future__ import print_function, division
 import os
 import torch
-#import pandas as pd
-from skimage import io, transform
-import numpy as np
+from torch.utils.data import Dataset
+
 import matplotlib.pyplot as plt
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms, utils
-import torchvision.transforms.functional as TF
-import scipy.io as sio
-#import torchvision.transforms as transforms
-from skimage import data
-from skimage.transform import resize as rsz
-# 
-# Ignore warnings
 import warnings
 warnings.filterwarnings("ignore")
-import math
-import torchio as tio
-import random
 plt.ion()   # interactive mode
-import utilities
 from utilities import norm_data
+import albumentations as A
+
+#from pydicom import dcmread
 
 def transforma():
-    transforms = (tio.RandomFlip(axes=['LR', 'AP', 'IS']), tio.RandomBlur())
-    trans = tio.Compose(transforms)
-    
-    return trans
+    #transform = A.Compose([A.Flip(p=0.5), A.Blur(p=0.5)], additional_targets={'image0': 'image', 'image1': 'image'})
+    transform = A.Compose([A.Flip(p=0.5)], additional_targets={'image0': 'image', 'image1': 'image'})
+    return transform
 
 
 
 def get_mat(self, scan_idx,z_idx, mat_name):     
-    name = os.path.join(self.root_dir,"phantom"+str(scan_idx),mat_name)
-    mat = sio.loadmat(name)[mat_name][:,:,z_idx:z_idx+self.multi_slice_n]
+    name = os.path.join(self.root_dir,"Reframed_"+str(scan_idx),mat_name)
+    X = dcmread(name)
+    X = X.pixel_array
+    mat = X[:,:,z_idx:z_idx+self.multi_slice_n]
     mat = norm_data(mat)
     return mat
 
 
-class RIDER_Dataset(Dataset):
+class RAMBAM_Dataset(Dataset):
     """Low Dose PET dataset."""
 
-    def __init__(self, root_dir, params):
+    def __init__(self, data, root_dir, params):
         """
         Args:
             root_dir (string): Directory with all the images.
@@ -57,49 +47,53 @@ class RIDER_Dataset(Dataset):
         """
         self.root_dir = root_dir
         self.length = params['length']
-        self.new_h = params['new_h']
-        self.new_w = params['new_w']
+
         self.num_of_slices = params['num_of_slices']
         self.multi_slice_n = params['multi_slice_n']
         self.train_val_test = params['train_val_test']
         self.num_chan = params['num_chan']
-        self.subject = tio.datasets.FPG()
+        self.drf = params['drf']
         self.transforms = transforma()
+        self.data = data
     def __len__(self):
         return self.length
 
     def __getitem__(self,idx):
-        scan_idx = math.floor(idx/(self.num_of_slices-self.multi_slice_n))+1
-        z_idx = idx%(self.num_of_slices-self.multi_slice_n)+1
-        #trf = transforma(self)
-        #LDPT = trf(torch.tensor(rsz(get_mat(self, scan_idx, z_idx, "LD_PT"), (self.new_h, self.new_w), anti_aliasing=True)).unsqueeze(0))
-        #NDPT = trf(torch.tensor(get_mat(self, scan_idx, z_idx, "ND_PT")).unsqueeze(0))
-        #SCCT = trf(torch.tensor(get_mat(self, scan_idx, z_idx, "SC_CT")).unsqueeze(0))
-        LDPT = torch.tensor(rsz(get_mat(self, scan_idx, z_idx, "LD_PT"), (self.new_h, self.new_w), anti_aliasing=True)).unsqueeze(0)
-        NDPT = torch.tensor(get_mat(self, scan_idx, z_idx, "ND_PT")).unsqueeze(0)
-        SCCT = torch.tensor(rsz(get_mat(self, scan_idx, z_idx, "SC_CT"), (self.new_h, self.new_w), anti_aliasing=True)).unsqueeze(0)
+        drf = self.drf
+        data = self.data
+  
+        LDPT = data.iloc[idx].LDPT[0].astype(float)
+        #print('before trans ', LDPT.dtype)
+
+        #print('after', LDPT[60:65, 60:65])
+        #norm_data(LDPT)
+        NDPT = data.iloc[idx].HDPT[0].astype(float)
+        SCCT = data.iloc[idx].CT[0].astype(float)
+        Dose = data.iloc[idx].Dose
+        transformed = self.transforms(image=LDPT, image0=NDPT, image1=SCCT)
         #print(LDPT.shape)
-        seed = torch.randint(100,(1,)).data
-        random.seed(seed)
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed(seed)
-        np.random.seed(seed)
-        LDPT = self.transforms(LDPT)
-        random.seed(seed)
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed(seed)
-        np.random.seed(seed)
-        NDPT = self.transforms(NDPT)
-        random.seed(seed)
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed(seed)
-        np.random.seed(seed)
-        SCCT = self.transforms(SCCT)
+        LDPT = transformed["image"]
+        NDPT = transformed["image0"]
+        SCCT = transformed["image1"]
+        
+        #LDPT[LDPT<1]=0
+        #print('after trans ', LDPT.dtype)
+        #LDPT = norm_data(torch.tensor(LDPT)).unsqueeze(0).unsqueeze(3)
+        #NDPT = norm_data(torch.tensor(NDPT)).unsqueeze(0).unsqueeze(3)
+        #SCCT = norm_data(torch.tensor(SCCT)).unsqueeze(0).unsqueeze(3)
+        LDPT = norm_data(drf*torch.tensor(LDPT)).unsqueeze(0).unsqueeze(3)
+        NDPT = norm_data(torch.tensor(NDPT)).unsqueeze(0).unsqueeze(3)
+        SCCT = norm_data(torch.tensor(SCCT)).unsqueeze(0).unsqueeze(3)
+        #print('after norm ', LDPT.dtype)
+
+
+        
+        #print(LDPT)
         #print(NDPT.shape)
         if(self.num_chan==1):
-            sample = {'LDPT': LDPT, 'NDPT': NDPT, 'scan_idx':scan_idx, 'z_idx':z_idx}
+            sample = {'LDPT': LDPT, 'NDPT': NDPT, 'Dose': Dose}
         if(self.num_chan==2):
-            sample = {'LDPT': torch.cat((LDPT, SCCT), dim=0), 'NDPT': NDPT, 'scan_idx':scan_idx, 'z_idx':z_idx}
+            sample = {'LDPT': torch.cat((LDPT, SCCT), dim=0), 'NDPT': NDPT, 'Dose': Dose}
 
         return sample
     

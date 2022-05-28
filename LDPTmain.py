@@ -2,7 +2,7 @@
 #chmod +x ./LDPTmain.sh
 import os
 import dataset
-from dataset import RIDER_Dataset
+from dataset import RAMBAM_Dataset
 import u_net_torch
 from u_net_torch import Net
 from utilities import train_val_test_por
@@ -16,13 +16,18 @@ from params import scan_params
 import os
 import torch.nn as nn
 import torch.optim as optim
-
+import pandas as pd
 from tqdm import tqdm
 from utilities import load_model
+from utilities import arrange_data
 from torch.utils.tensorboard import SummaryWriter
 from skimage.metrics import structural_similarity as ssim
-from matplotlib_scalebar.scalebar import ScaleBar
+import random
 from torchsummary import summary
+#from matplotlib_scalebar.scalebar import ScaleBar
+#from torchsummary import summary
+plt.ion()
+
 
 CUDA_VISIBLE_DEVICES=1 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -30,8 +35,13 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 params = scan_params()
 num_chan = params['num_chan']
-root_dir = os.path.join(os.getcwd(), 'RIDER phantom dataset/phantom_dataset_RIDER')
-_dataset = RIDER_Dataset(root_dir, params)
+root_dir = os.path.join(os.getcwd(),'RAMBAM_dataset/RAMBAM_DATASET')
+
+#data = arrange_data(params, root_dir)
+#print(data.head)
+#data.to_pickle("./data.pkl", compression='infer', protocol=4)
+data = pd.read_pickle("./data.pkl", compression='infer')
+_dataset = RAMBAM_Dataset(data, root_dir, params)
 
 
 train_por, val_por, test_por = train_val_test_por(params)
@@ -44,15 +54,17 @@ trainloader_1 = torch.utils.data.DataLoader(train_set, batch_size=params['batch_
                                             shuffle=True, num_workers=8)
 trainloader_2 = torch.utils.data.DataLoader(val_set, batch_size=params['batch_size'],
                                             shuffle=True, num_workers=8)
-#trainloader_3 = torch.utils.data.DataLoader(test_set, params['batch_size'],
-#                                           shuffle=True, num_workers=8)
+trainloader_3 = torch.utils.data.DataLoader(test_set, params['batch_size'], shuffle=True, num_workers=8)
 
 l = []
-t=0
+t=2
 N = params['num_of_epochs']
 PATH = str(params['num_of_epochs']) + "_epochs_" + str(params['num_kernels']) + "_kernels_" + str(params['num_chan']) + "_chan_" + str(params['multi_slice_n']) + "_slices" + ".pt"
 if(t==1):
     net = Net(params)
+    #summary(net, input_size=(8, 1, 128, 128, 1))
+    #print(net)
+    ###########################!!!!!!! remember to bring it back
     net.to(device)
 
     criterion = nn.MSELoss()
@@ -72,10 +84,21 @@ if(t==1):
         SSIM_LDPT_NDPT_valid = []
         SSIM_RESU_NDPT_valid = []
         for i, data in enumerate(trainloader_1, 0):
+ 
             inputs = data['LDPT'].to(device)
-            outputs = data['NDPT'].to(device) 
+            outputs = data['NDPT'].to(device)
+            #print(inputs[0,0,:,:,0].detach().cpu().dtype)
             optimizer.zero_grad()
             results = net(inputs)
+            #results=inputs
+            if(random.randint(1,100)==9):
+                plt.figure()
+                plt.title('right before net')
+                plt.subplot(1,2,1)
+                plt.imshow(results[0,0,:,:,0].detach().cpu())
+                plt.subplot(1,2,2)
+                plt.imshow(data['NDPT'][0,0,:,:,0])
+                #print(data['NDPT'][0,0,:,:,0].dtype)
             loss = criterion(results, outputs)
             loss.backward()
             optimizer.step()
@@ -86,8 +109,10 @@ if(t==1):
         net.eval()     # Optional when not using Model Specific layer
         running_valid_loss = 0.0
         for i, data in enumerate(trainloader_2, 0):
-            inputs = data['LDPT'].to(device)    
-            outputs = data['NDPT'].to(device)          
+            inputs = data['LDPT'].to(device)   
+            outputs = data['NDPT'].to(device)
+            #print(inputs)
+            #print(inputs.float())
             results = net(inputs)
             loss = criterion(results, outputs)        
             running_valid_loss = running_valid_loss + loss.item()
@@ -134,9 +159,55 @@ if(t==1):
  
 if(t==0): 
     loss_path = 'f1.txt'
-    load_model(PATH, trainloader_1, loss_path)
+    load_model(PATH, trainloader_2, loss_path)
 
-
+if(t==2):
+  
+    for epoch in range(N):  # loop over the dataset multiple times
+    
+        for i, data in enumerate(trainloader_2, 0):
+ 
+            inputs = data['LDPT'].to(device)
+            outputs = data['NDPT'].to(device)
+            #print(inputs.size())
+  
+            if(random.randint(1,100)==9):
+                plt.figure()
+                plt.subplot(1,2,1)
+                print(data['NDPT'].size()[0])
+                #m = torch.mean(data['NDPT'][0,0,:,:,0])
+                #print(m)
+                #plt.title(str(m))
+                plt.imshow(data['LDPT'][0,0,:,:,0])
+                plt.subplot(1,2,2)
+                #m = torch.mean(data['LDPT'][0,0,:,:,0])
+                #print(m)
+                #plt.title(str(m))
+                plt.imshow(data['NDPT'][0,0,:,:,0])
+                m=[]
+                m1=[]
+                for idx in range(data['NDPT'].size()[0]):  	
+                    m.append(torch.mean(data['NDPT'][idx,0,:,:,0]))
+                    m1.append(torch.mean(data['LDPT'][idx,0,:,:,0]))
+                print("NDPT")
+                print(m)
+                print("LDPT")
+                print(m1)
+if(t==3):
+  
+    for epoch in range(N):  # loop over the dataset multiple times
+    
+        for i, data in enumerate(trainloader_1, 0):
+ 
+            m = []
+            m1 = []
+            for idx in range(data['NDPT'].size()[0]):  	
+                m.append(torch.mean(data['NDPT'][idx,0,:,:,0]))
+                m1.append(torch.mean(data['LDPT'][idx,0,:,:,0]))
+            print("NDPT")
+            print(m)
+            print("LDPT")
+            print(m1)
 # 1. norm all data according to low dose with low dose, high dose with high dose and multiply low dose with DRF
 # 2. try on 1/5 dose
 # 3. display diff

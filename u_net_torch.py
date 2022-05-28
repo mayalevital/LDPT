@@ -21,6 +21,7 @@ class encoder(nn.Module):
         self.pad = int((self.kernel_size-1)/2)
         self.num_chan = params['num_chan']
         self.num_kernels = params['num_kernels']
+        torch.set_default_dtype(torch.float64)
         conv = nn.Conv3d
         batchnorm = nn.BatchNorm3d
         self.pool = nn.MaxPool3d((2,2,1))
@@ -145,10 +146,14 @@ class Net(nn.Module):
         #self.pool = nn.MaxPool3d((1,1,self.multi_slice_n))
     def forward(self, x):
         #encoder
+        #print(x[0, 0, 50:60, 50:60, 0])
+        #print(x[0, 0, 50:60, 50:60, 0].float())
+        #x = x.float()
         in_ = x
+        
         if(self.num_chan==2):
             in_ = self.input_conv(in_)
-        #print("input", x.shape)
+        #print("input", in_.dtype)
         [x0, x] = self.encoder0(x)
         [x1, x] = self.encoder1(x)
         [x2, x] = self.encoder2(x)
