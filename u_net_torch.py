@@ -21,7 +21,7 @@ class encoder(nn.Module):
         self.pad = int((self.kernel_size-1)/2)
         self.num_chan = params['num_chan']
         self.num_kernels = params['num_kernels']
-        torch.set_default_dtype(torch.float64)
+        torch.set_default_dtype(torch.float32)
         conv = nn.Conv3d
         batchnorm = nn.BatchNorm3d
         self.pool = nn.MaxPool3d((2,2,1))

@@ -15,18 +15,37 @@ import numpy as np
 import SimpleITK as sitk
 
 import numpy as np
-import os
 from ipywidgets import interact, fixed
 
 import matplotlib.pyplot as plt
 #%matplotlib inline
 import pandas as pd
+import math
+
+import os
+import torch
+from torch.utils.data import Dataset
+
+import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings("ignore")
+plt.ion()   # interactive mode
+
+import albumentations as A
+import gdcm
+from pydicom import dcmread
+import numpy as np
+
+def transforma():
+    transform = A.Compose([A.Flip(p=0.5)], additional_targets={'image0': 'image', 'image1': 'image'})
+    return transform
+
+def get_mat(name):
+    X = dcmread(name)
+    X = X.pixel_array.astype(np.float32)
+    return X
 
 def resize_resample_images(PET_data, CT): 
-    #print('pixel type PET: ' + str(PET_data.GetPixelIDTypeAsString()))
-    #print('pixel type CT: ' + str(CT.GetPixelIDTypeAsString()))
-    #print('before')
-    #print('size: ' + str(CT.GetSize()))
     new_CT = sitk.Resample(CT, PET_data.GetSize(),
                                  sitk.Transform(), 
                                  sitk.sitkLinear,
@@ -35,94 +54,88 @@ def resize_resample_images(PET_data, CT):
                                  PET_data.GetDirection(),
                                  np.min(CT).astype('double'),
                                  CT.GetPixelID())
-    #print('after')
-    #print('size: ' + str(new_CT.GetSize()))
     return new_CT
 
 def arrange_data(params, root_dir):
-    real_list = params['real_list']
     dose_list = params['dose_list']
-    full_dose = params['full_dose'][0]
-    CT_folder = os.path.join(root_dir, 'CT')
     chop = params['chop']
-    #print(CT_folder)
-    reader = sitk.ImageSeriesReader()
-    dicom_names = reader.GetGDCMSeriesFileNames(CT_folder)
-    reader.SetFileNames(dicom_names)
-    s = 0
-    CT = reader.Execute()
-    df = pd.DataFrame(columns=['real', 'Dose', 'LDPT', 'HDPT', 'CT'])
+
+    df = pd.DataFrame(columns=['sub_ID', 'slice', 'Dose', 'LDPT', 'HDPT'])
     i=0
-    for real in real_list:
-        print(real)
-        print(full_dose)
-        reader = sitk.ImageFileReader()
-        PET_folder = os.path.join(root_dir, real, full_dose)
-        PET_DCM = os.path.join(PET_folder, os.listdir(PET_folder)[0])
-        print(PET_DCM)
-        reader.SetFileName(PET_DCM)
-        FD_PET = reader.Execute()
-        FD_PET = sitk.Cast(FD_PET, sitk.sitkUInt32)
-        for dose in dose_list:
-            PET_folder = os.path.join(root_dir, real, dose)
-            PET_DCM = os.path.join(PET_folder, os.listdir(PET_folder)[0])
-            print(PET_DCM)
-            reader.SetFileName(PET_DCM)
-            PET = reader.Execute()
+    for direct in root_dir:
+        sub = os.listdir(direct)
+        sub = [s for s in sub if s[-1] != 'p']       #remove zipped  
+        for sub_dir in sub:
+            sub_path = os.path.join(direct, sub_dir)
+            sub_sub_path = os.listdir(sub_path)
+            sub_sub_path = [s for s in sub_sub_path if s[-1] != 'X']       #remove zipped  
+            for scans in sub_sub_path:
+                sub_ID = scans[-6:] #pt. ID
+                s_sub_path = os.path.join(direct, sub_dir, scans)
+                d_scans = os.listdir(s_sub_path)
+                FD_scan = [d for d in d_scans if (d[-6:] == 'NORMAL' or d[-6:] == 'normal' or d == 'Full_dose' or d == 'FD')]
+                for FD in FD_scan:
+                    FD_path = os.path.join(s_sub_path, FD)
+                    for Dose in dose_list:
+                        LD_scan = [d for d in d_scans if Dose in d][0]
+                        LD_path = os.path.join(s_sub_path, LD_scan)
+                        slices = os.listdir(LD_path)
+                        for sl in slices:
+                            LD = os.path.join(LD_path, sl)
+                            FD = os.path.join(FD_path, sl)
+                            data = {'sub_ID': sub_ID, 'slice': sl, 'Dose': Dose, 'LDPT':LD, 'HDPT':FD}
+                            #print(data)
+                            df.loc[i] = data
+                            i=i+1
                             
-            PET = sitk.Cast(PET, sitk.sitkUInt32)
-           
-            if(s==0):
-                new_CT = resize_resample_images(PET, CT)
-                #new_CT = CT
-            s = 1
-
-            for slice in range(chop, new_CT.GetSize()[0]-chop):
-                #print(np.median(sitk.GetArrayFromImage(PET)[slice, :, :]))
-                d = {'real': real, 'Dose': dose, 'LDPT': [sitk.GetArrayFromImage(PET)[slice, :, :]], 'HDPT':[sitk.GetArrayFromImage(FD_PET)[slice, :, :]], 'CT':[sitk.GetArrayFromImage(new_CT)[slice, :, :]]}
-                df.loc[i] = d
-                i=i+1
+                            print(i)
+                        
     return df
-def train_val_test_por(params):
-    num_of_slices=params['num_of_slices']
-    multi_slice_n=params['multi_slice_n']
-    train_val_test=params['train_val_test']
+                    
+                        
+def split(original_list, weight_list, data):
+    sublists = []
+    prev_index = 0
+    for weight in weight_list:
+        next_index = prev_index + math.ceil( (len(original_list) * weight) )
 
-    train_por = list(range(1,(num_of_slices-multi_slice_n)*train_val_test[0]))
-    val_por = list(range((num_of_slices-multi_slice_n)*train_val_test[0]+1, (num_of_slices-multi_slice_n)*(train_val_test[0]+train_val_test[1])))
-    test_por = list(range((num_of_slices-multi_slice_n)*(train_val_test[0]+train_val_test[1])+1, 
-                      (num_of_slices-multi_slice_n)*(train_val_test[0]+train_val_test[1]+
-                                                     train_val_test[2])))
-    #print("train por", train_por)
-    #print("val_por", val_por)
-    #print("test_por", test_por)
+        sublists.append( original_list[prev_index : next_index] )
+        prev_index = next_index
+    df1 = data.iloc[sublists[0]] 
+    df2 = data.iloc[sublists[1]]
+    df3 = data.iloc[sublists[2]]
+    df12_merge = pd.merge(df1, df2, on='sub_ID', how='inner')
+    df23_merge = pd.merge(df2, df3, on='sub_ID', how='inner')
+    
+    df1.drop(df1.index[df1['sub_ID'] == df12_merge['sub_ID'].unique()[0]], inplace=True)
+    df2.drop(df2.index[df2['sub_ID'] == df23_merge['sub_ID'].unique()[0]], inplace=True)
+ 
+    return list(df1.index), list(df2.index), list(df3.index)                   
+                
+    
+def train_val_test_por(params, data):
+    length = len(data)
+    my_list = list(range(1, length))
+    weight_list = params['train_val_test'] # This equals to your 20%, 30% and 50%
 
-    return train_por, val_por, test_por
+    sublists = split(my_list, weight_list, data)
+    #print()
+    return sublists[0], sublists[1], sublists[2]
 
 def norm_data(data):
-    #using Frobenius norm as in Ultra–Low-Dose 18F-Florbetaben Amyloid PET Imaging Using Deep Learning with Multi-Contrast MRI Inputs
-    #norm = torch.norm(data,dim=(2,3))
-    #print(norm.shape)
-    #print(data.shape)
-    #for i in range(0, data.shape[0]):
-    #    data[i, :, :, :, :]=data[i, :, :, :, :]/norm[i]
-    #data=data/norm
-    #data = (data-data.min())/(data.max()-data.min())
-    #print('before norm', data.shape)
-    #print('before', data.dtype)
-    #data1=data
+    
     if(torch.std(data)==0):
         std=1
     else:
         std=torch.std(data)
     data = (data-torch.mean(data))/std
-    #data[data1==0]=0
-    #print
-    #print('after norm', data.dtype)
-    #print('mean', torch.mean(data))
-    #print(data.max())
+   
 
     return data
+
+
+
+
 
 def plot_result(ct, results, inputs, outputs, mask):
     #scalebar = ScaleBar(0.08, "log L2 norm", length_fraction=0.25)
