@@ -15,27 +15,27 @@ import warnings
 warnings.filterwarnings("ignore")
 plt.ion()   # interactive mode
 from utilities import norm_data
+from utilities import stand_data
 import albumentations as A
-
-#from pydicom import dcmread
+import gdcm
+from pydicom import dcmread
+import numpy as np
+import time
+from PIL import Image
 
 def transforma():
-    #transform = A.Compose([A.Flip(p=0.5), A.Blur(p=0.5)], additional_targets={'image0': 'image', 'image1': 'image'})
     transform = A.Compose([A.Flip(p=0.5)], additional_targets={'image0': 'image', 'image1': 'image'})
     return transform
 
 
 
-def get_mat(self, scan_idx,z_idx, mat_name):     
-    name = os.path.join(self.root_dir,"Reframed_"+str(scan_idx),mat_name)
+def get_mat(name):
     X = dcmread(name)
-    X = X.pixel_array
-    mat = X[:,:,z_idx:z_idx+self.multi_slice_n]
-    mat = norm_data(mat)
-    return mat
+    X = X.pixel_array.astype(np.float32)
+    return X
 
 
-class RAMBAM_Dataset(Dataset):
+class ULDPT(Dataset):
     """Low Dose PET dataset."""
 
     def __init__(self, data, root_dir, params):
@@ -46,55 +46,35 @@ class RAMBAM_Dataset(Dataset):
                 on a sample.
         """
         self.root_dir = root_dir
-        self.length = params['length']
-
-        self.num_of_slices = params['num_of_slices']
         self.multi_slice_n = params['multi_slice_n']
         self.train_val_test = params['train_val_test']
         self.num_chan = params['num_chan']
         self.drf = params['drf']
         self.transforms = transforma()
         self.data = data
+        self.length = data.size
     def __len__(self):
         return self.length
 
     def __getitem__(self,idx):
+        #tic = time.time() 
         drf = self.drf
         data = self.data
-  
-        LDPT = data.iloc[idx].LDPT[0].astype(float)
-        #print('before trans ', LDPT.dtype)
-
-        #print('after', LDPT[60:65, 60:65])
-        #norm_data(LDPT)
-        NDPT = data.iloc[idx].HDPT[0].astype(float)
-        SCCT = data.iloc[idx].CT[0].astype(float)
+        LDPT = get_mat(data.iloc[idx].LDPT)
+        NDPT = get_mat(data.iloc[idx].HDPT)
+        #LDPT = np.array(Image.open("/tcmldrive/users/Maya/1_epochs_3_kernels_1_chan_1_slices.pt_valid__loss_ssim_.jpg")).astype(np.float32)
+        #NDPT = np.array(Image.open("/tcmldrive/users/Maya/1_epochs_3_kernels_1_chan_1_slices.pt_valid__loss_ssim_.jpg")).astype(np.float32)
         Dose = data.iloc[idx].Dose
-        transformed = self.transforms(image=LDPT, image0=NDPT, image1=SCCT)
-        #print(LDPT.shape)
-        LDPT = transformed["image"]
-        NDPT = transformed["image0"]
-        SCCT = transformed["image1"]
-        
-        #LDPT[LDPT<1]=0
-        #print('after trans ', LDPT.dtype)
-        #LDPT = norm_data(torch.tensor(LDPT)).unsqueeze(0).unsqueeze(3)
-        #NDPT = norm_data(torch.tensor(NDPT)).unsqueeze(0).unsqueeze(3)
-        #SCCT = norm_data(torch.tensor(SCCT)).unsqueeze(0).unsqueeze(3)
-        LDPT = norm_data(drf*torch.tensor(LDPT)).unsqueeze(0).unsqueeze(3)
-        NDPT = norm_data(torch.tensor(NDPT)).unsqueeze(0).unsqueeze(3)
-        SCCT = norm_data(torch.tensor(SCCT)).unsqueeze(0).unsqueeze(3)
-        #print('after norm ', LDPT.dtype)
-
-
-        
-        #print(LDPT)
-        #print(NDPT.shape)
-        if(self.num_chan==1):
-            sample = {'LDPT': LDPT, 'NDPT': NDPT, 'Dose': Dose}
-        if(self.num_chan==2):
-            sample = {'LDPT': torch.cat((LDPT, SCCT), dim=0), 'NDPT': NDPT, 'Dose': Dose}
-
+        transformed = self.transforms(image=LDPT, image0=NDPT)
+        [LDPT, norm_L] = norm_data(torch.tensor(transformed["image"]))
+        [NDPT, norm_N] = norm_data(torch.tensor(transformed["image0"]))
+        #print(norm_L.size())
+        LDPT = LDPT.unsqueeze(0)
+        NDPT = NDPT.unsqueeze(0)
+        sample = {'LDPT': LDPT, 'NDPT': NDPT, 'Dose': Dose}
+                 # , 'norm_L':norm_L, 'norm_N':norm_N}
+        #toc = time.time()
+        #print(toc-tic, 'time to load image in sec Elapsed')
         return sample
     
 

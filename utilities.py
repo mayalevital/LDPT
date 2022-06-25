@@ -30,32 +30,49 @@ import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
 plt.ion()   # interactive mode
+from skimage.metrics import structural_similarity as ssim
 
 import albumentations as A
 import gdcm
 from pydicom import dcmread
 import numpy as np
+import pickle
+import torch.nn as nn
+from timm.models.layers import trunc_normal_
 
-def transforma():
-    transform = A.Compose([A.Flip(p=0.5)], additional_targets={'image0': 'image', 'image1': 'image'})
-    return transform
+def ModelParamsInit(model):
+    assert isinstance(model, nn.Module)
+    for m in model.modules():
+        if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d, nn.Linear)):
+            trunc_normal_(m.weight, std=0.02)
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, (nn.LayerNorm, nn.GroupNorm)):
+            if m.weight is not None:
+                nn.init.constant_(m.weight, 1.0)
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
 
-def get_mat(name):
-    X = dcmread(name)
-    X = X.pixel_array.astype(np.float32)
-    return X
-
-def resize_resample_images(PET_data, CT): 
-    new_CT = sitk.Resample(CT, PET_data.GetSize(),
-                                 sitk.Transform(), 
-                                 sitk.sitkLinear,
-                                 PET_data.GetOrigin(),
-                                 PET_data.GetSpacing(),
-                                 PET_data.GetDirection(),
-                                 np.min(CT).astype('double'),
-                                 CT.GetPixelID())
-    return new_CT
-
+def save_list(l, name):
+    file_name = name 
+    open_file = open(file_name, "wb")
+    pickle.dump(l, open_file)
+    open_file.close()
+    
+def load_list(file_name):
+    open_file = open(file_name, "rb")
+    loaded_list = pickle.load(open_file)
+    open_file.close()
+    return loaded_list
+    #print(loaded_list)
+    
+def save_run(PATH, net, train_loss, valid_loss, valid_in_ssim, valid_res_ssim):
+    torch.save(net, os.path.join(PATH, "net.pt"))
+    save_list(train_loss, os.path.join(PATH, 'train_loss.pkl'))
+    save_list(valid_loss, os.path.join(PATH, 'valid_loss.pkl'))
+    save_list(valid_in_ssim, os.path.join(PATH, 'valid_in_ssim.pkl'))
+    save_list(valid_res_ssim, os.path.join(PATH, 'valid_res_ssim.pkl'))
+    
 def arrange_data(params, root_dir):
     dose_list = params['dose_list']
     chop = params['chop']
@@ -80,15 +97,18 @@ def arrange_data(params, root_dir):
                         LD_scan = [d for d in d_scans if Dose in d][0]
                         LD_path = os.path.join(s_sub_path, LD_scan)
                         slices = os.listdir(LD_path)
+                        #print(len(slices))
                         for sl in slices:
                             LD = os.path.join(LD_path, sl)
                             FD = os.path.join(FD_path, sl)
+                            #if(test_ssim(LD, FD)==1):
                             data = {'sub_ID': sub_ID, 'slice': sl, 'Dose': Dose, 'LDPT':LD, 'HDPT':FD}
                             #print(data)
                             df.loc[i] = data
                             i=i+1
                             
-                            print(i)
+                            #print(i)
+                        #slices = []
                         
     return df
                     
@@ -122,70 +142,112 @@ def train_val_test_por(params, data):
     #print()
     return sublists[0], sublists[1], sublists[2]
 
-def norm_data(data):
+def scale_data(data):
     
     if(torch.std(data)==0):
         std=1
     else:
         std=torch.std(data)
-    data = (data-torch.mean(data))/std
+    
+    if(torch.max(data)!=0):
+     
+        data = (data-torch.min(data))/(torch.max(data)-torch.min(data))-torch.tensor(0.5)
    
-
     return data
 
+def stand_data(data):
+    
+    if(torch.std(data)==0):
+        std=1
+    else:
+        std=torch.std(data)
+    data = (data-torch.mean(data))/(std)
+ 
+    return data
 
+def norm_data(data):
+    norm=torch.norm(data, p='fro', dim=None, keepdim=False, out=None, dtype=None)
+    if(norm==0):
+        norm=1
+    data = data/norm
+    #print(norm)
+    return data, norm
 
+def calc_ssim(LDPT, NDPT):
+    ssim_c = []
+ 
+    s=LDPT.shape
+    for i in range(s[0]):
+        LD=LDPT[i][0]
+        ND=NDPT[i][0]
+        LDPT1 = stand_data(LD)
+        NDPT1 = stand_data(ND)
+        #print(stand_data(LD))
+        ssim_=ssim(NDPT1.numpy(), LDPT1.numpy())
+        ssim_c.append(ssim_)
+        
+    return sum(ssim_c)/len(ssim_c)
+    
 
-
-def plot_result(ct, results, inputs, outputs, mask):
+def plot_result(results, inputs, outputs, ssim_LD_ND, ssim_RE_ND):
     #scalebar = ScaleBar(0.08, "log L2 norm", length_fraction=0.25)
 
-    f, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, sharey=True)
-    ax1.imshow(np.log(((results-outputs)**2)/mask))
-    ax1.set_title('log l2 norm % net / ND')
-    #ax2.imshow(two, vmin=0, vmax=1)
-    ax2.imshow(np.log(((outputs-inputs[0])**2)/mask))
-
-    ax2.set_title('log l2 norm % LD / ND')
-    #ax2.colorbar()
-    ax3.imshow(np.log(((results-inputs)**2)/mask))
-    ax3.set_title('log l2 norm % net / LD')
-    #ax3.colorbar()
-    ax4.imshow(inputs)
-    ax4.set_title('LDPT')
-    #ax5.imshow(inputs)
-    #ax5.set_title('LDPT')
-    #scalebar = ScaleBar()
-    #ax1.add_artist(scalebar)
-    #ax2.add_artist(scalebar)
-    #ax3.add_artist(scalebar)
+    f, (ax1, ax2, ax3) = plt.subplots(1, 3, sharey=True)
+    
+    ax1.imshow(inputs)
+    ax1.set_title('LDPT')
+    
+    ax2.imshow(outputs)
+    ax2.set_title('NDPT')
+    
+    ax3.imshow(results)
+    ax3.set_title('NET')
 
     plt.show()
     
-def load_model(PATH, trainloader_2, loss_path):
-        net = torch.load(PATH)
+def load_model(N, PATH, trainloader_2):
+        net = torch.load(os.path.join(PATH, 'net.pt'))
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         std = []
         for i, data in enumerate(trainloader_2, 0):
           
             inputs = data['LDPT'].to(device)
             results = net(inputs)
-            ct = inputs[0,0,:,:,0].detach().cpu()
-            inputs = inputs[0,0,:,:,0].detach().cpu()
+           
+            inputs = inputs[0,0,:,:].detach().cpu()
             print(inputs.shape)
 
             outputs = data['NDPT'].to(device)
-            outputs = outputs[0,0,:,:,0].detach().cpu() 
-            results = results[0,0,:,:,0].detach().cpu() 
-            #print(outputs[50:60, 50:60])
-            #print(inputs[50:60, 50:60])
+            outputs = outputs[0,0,:,:].detach().cpu() 
+            results = results[0,0,:,:].detach().cpu() 
+           
 
             print("LDPT/NDPT", ssim(inputs.numpy(), outputs.numpy()))
             print("results/NDPT", ssim(results.numpy(), outputs.numpy()))
-            mask = outputs
-            mask[mask<0.0000001] =1
-            if(i%10==1):
+            #out = outputs
+            #mask = out
+            #mask[mask<0.0000001] =1
+            if(i%100==1):
                 #plot_result(np.log(results-outputs)-np.log(outputs), np.log(inputs-outputs)-np.log(outputs), np.log(results-inputs)-np.log(outputs))
-                plot_result(ct, results, inputs, outputs, mask)
+                plot_result(results, inputs, outputs, ssim(inputs.numpy(), outputs.numpy()), ssim(results.numpy(), outputs.numpy()))
+        fig, (ax1, ax2) = plt.subplots(2)
+        
+        train_loss = load_list(os.path.join(PATH, 'train_loss.pkl'))
+        valid_loss = load_list(os.path.join(PATH, 'valid_loss.pkl'))
+        valid_in_ssim = load_list(os.path.join(PATH, 'valid_in_ssim.pkl'))
+        valid_res_ssim = load_list(os.path.join(PATH, 'valid_res_ssim.pkl'))
     
+        ax1.plot(range(0,N), train_loss, label = "training loss")
+        ax1.plot(range(0,N), valid_loss, label = "validation loss")
+        ax1.set(ylabel="loss")
+        ax1.legend()
+        ax1.set_title("training / validation loss over epochs")
+        #axs[0].savefig(PATH + "train_valid_loss" + ".jpg")
+        
+        ax2.plot(range(0,N), valid_in_ssim, label = "LDPT/NDPT ssim")
+        ax2.plot(range(0,N), valid_res_ssim, label = "result/NDPT ssim")
+        ax2.set(ylabel="ssim")
+        ax2.legend()
+        ax2.set_title("validation ssim over epochs")
+        fig.savefig(os.path.join(PATH, "_valid__loss_ssim.jpg"))
         #print(median(std))
