@@ -50,6 +50,7 @@ class ULDPT(Dataset):
         self.train_val_test = params['train_val_test']
         self.num_chan = params['num_chan']
         self.drf = params['drf']
+        self.gain = params['gain']
         self.transforms = transforma()
         self.data = data
         self.length = data.size
@@ -60,6 +61,7 @@ class ULDPT(Dataset):
         #tic = time.time() 
         drf = self.drf
         data = self.data
+        gain = self.gain
         LDPT = get_mat(data.iloc[idx].LDPT)
         NDPT = get_mat(data.iloc[idx].HDPT)
         #LDPT = np.array(Image.open("/tcmldrive/users/Maya/1_epochs_3_kernels_1_chan_1_slices.pt_valid__loss_ssim_.jpg")).astype(np.float32)
@@ -69,12 +71,12 @@ class ULDPT(Dataset):
         [LDPT, norm_L] = norm_data(torch.tensor(transformed["image"]))
         [NDPT, norm_N] = norm_data(torch.tensor(transformed["image0"]))
         #print(norm_L.size())
-        LDPT = LDPT.unsqueeze(0)
-        NDPT = NDPT.unsqueeze(0)
+        LDPT = torch.tensor(gain)*LDPT.unsqueeze(0)
+        NDPT = torch.tensor(gain)*NDPT.unsqueeze(0)
         sample = {'LDPT': LDPT, 'NDPT': NDPT, 'Dose': Dose}
                  # , 'norm_L':norm_L, 'norm_N':norm_N}
         #toc = time.time()
-        #print(toc-tic, 'time to load image in sec Elapsed')
+        #print(LDPT.type())
         return sample
     
 

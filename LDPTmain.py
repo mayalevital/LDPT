@@ -35,49 +35,53 @@ import unet_2
 from unet_2 import BasicUNet
 from utilities import calc_ssim
 from utilities import ModelParamsInit
+from utilities import save_run
 plt.ion()
-
 
 CUDA_VISIBLE_DEVICES=1 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-
+torch.set_default_dtype(torch.float32)
 params = scan_params()
 num_chan = params['num_chan']
 root_dir = ['/tcmldrive/databases/Public/uExplorer/']
 
 #data = arrange_data(params, root_dir)
 #print(data.head)
-#data.to_pickle("./data_100.pkl", compression='infer', protocol=4)
+#data.to_pickle("./data_50.pkl", compression='infer', protocol=4)
 data = pd.read_pickle("./data_50.pkl", compression='infer')
 _dataset = ULDPT(data, root_dir, params)
 
-
 train_por, val_por, test_por = train_val_test_por(params, data)
+print(len(train_por))
+print(len(val_por))
+
 #print(train_por)
 train_set = torch.utils.data.Subset(_dataset, train_por)
 val_set = torch.utils.data.Subset(_dataset, val_por)
 test_set = torch.utils.data.Subset(_dataset, test_por)
 
 trainloader_1 = torch.utils.data.DataLoader(train_set, batch_size=params['batch_size'],
-                                            shuffle=True, num_workers=8)
+                                            shuffle=True, num_workers=12)
 trainloader_2 = torch.utils.data.DataLoader(val_set, batch_size=params['batch_size'],
-                                            shuffle=True, num_workers=8)
+                                            shuffle=True, num_workers=12)
 trainloader_3 = torch.utils.data.DataLoader(test_set, params['batch_size'], shuffle=True, num_workers=8)
 
 l = []
-t=1
+t=0
 N = params['num_of_epochs']
-PATH = str(params['num_of_epochs']) + "_epochs_" + str(params['num_kernels']) + "_kernels_" + str(params['num_chan']) + "_chan_" + str(params['multi_slice_n']) + "_slices" + ".pt"
+PATH = str(params['num_of_epochs']) + "_epochs_" + str(params['lr']) + "_lr"
+if not os.path.exists(PATH):
+  os.makedirs(PATH)
+
 if(t==1):
     
-    net = BasicUNet(spatial_dims=2, out_channels=1, features=(16, 16, 16, 32, 64, 16), norm=("group", {"num_groups": 4}), act=('leakyrelu', {'inplace': True, 'negative_slope': 0.01}), dropout=0.05)
+    net = BasicUNet(spatial_dims=2, out_channels=1, features=(16, 16, 16, 32, 64, 16), norm=("group", {"num_groups": 4}), act=('leakyrelu', {'inplace': True, 'negative_slope': 0.01}), dropout=0.1)
    
     net.to(device)
-    print(summary(net, input_size=(1, 360, 360)))
+    #print(summary(net, input_size=(1, 360, 360)))
     ModelParamsInit(net)
     criterion = nn.L1Loss()
-    optimizer=torch.optim.RMSprop(net.parameters(), lr=params['lr'], alpha=0.99, eps=1e-08, weight_decay=0.005, momentum=0, centered=False)
+    optimizer=torch.optim.RMSprop(net.parameters(), lr=params['lr'], alpha=0.99, eps=1e-08, weight_decay=params['weight_decay'], momentum=0, centered=False)
 
     valid_in_ssim = []
     valid_res_ssim = []
@@ -101,6 +105,8 @@ if(t==1):
             loss = criterion(results, outputs)
             loss.backward()
             optimizer.step()
+            #pull out the gradient
+            #add the noise gaussian with alpha std
             running_train_loss = running_train_loss + loss.item()
             SSIM_LDPT_NDPT_train.append(calc_ssim(inputs.detach().cpu(), outputs.detach().cpu()))
             SSIM_RESU_NDPT_train.append(calc_ssim(results.detach().cpu(), outputs.detach().cpu()))
@@ -132,10 +138,10 @@ if(t==1):
         valid_loss.append(running_valid_loss)
     print('Finished Training')
  
-    torch.save(net, PATH)
+    save_run(PATH, net, train_loss, valid_loss, valid_in_ssim, valid_res_ssim)
  
 if(t==0): 
-    load_model(PATH, trainloader_2)
+    load_model(N, PATH, trainloader_2)
 
 if(t==2):
   
