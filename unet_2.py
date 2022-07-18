@@ -6,6 +6,7 @@ import torch.nn as nn
 from monai.networks.blocks import Convolution, UpSample
 from monai.networks.layers.factories import Conv, Pool
 from monai.utils import deprecated_arg, ensure_tuple_rep
+from timm.models.layers import trunc_normal_
 
 __all__ = ["BasicUnet", "Basicunet", "basicunet", "BasicUNet"]
 
@@ -26,7 +27,9 @@ class fin_conv(nn.Sequential):
           
         """
        	super().__init__()
-       	fin_conv = nn.Sequential(nn.Conv2d(fea, out_channels, kernel_size=kernel_size), nn.Tanh())
+        conv2 = nn.Conv2d(fea, out_channels, kernel_size=kernel_size)
+       
+       	fin_conv = nn.Sequential(conv2 , nn.Tanh())
         self.add_module("fin_conv", fin_conv)
        
 
