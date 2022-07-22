@@ -54,12 +54,80 @@ from unet_2 import fin_conv
 import albumentations as A
 import h5py
 
+#root_dir = ['/tcmldrive/databases/Public/uExplorer/']
+#root_dir_siemens = ['/tcmldrive/databases/Public/SiemensVisionQuadra/']
+#data_siemens = arrange_data_siemense(params, root_dir_siemens)
+#data_U = arrange_data(params, root_dir)
+
+#data = data_U.append(data_siemens, ignore_index=True)
+#data_U.to_pickle("./data_all.pkl", compression='infer', protocol=4)
+#data_ = pd.read_pickle("./data_all.pkl", compression='infer')
+
+def dataframe_paths(PATH):
+    l=[]
+    df = pd.DataFrame(columns=['sub_ID', 'slice', 'Dose', 'LDPT', 'HDPT', 'scanner'])
+    i=0                           
+    for path, subdirs, files in os.walk(PATH):
+        
+        for name in files:
+            LD = os.path.join(path, name)
+            p = LD.split('/')
+            #print(p[7])
+            if p[7] == 'LD':
+                FD = LD.replace('/LD/', '/FD/')
+                data = {'sub_ID': p[6], 'slice': p[8], 'Dose': p[5], 'LDPT':LD, 'HDPT':FD, 'scanner': p[6][0]}
+                df.loc[i] = data
+                i=i+1
+                #print(data)
+    return df
+
+def split_df(df, params):
+    length = len(df)
+    weight_list = params['train_val_test'] 
+    lengths = [np.ceil(i*length) for i in weight_list]
+    h_length = [np.ceil(l/2) for l in lengths]
+    df_U = df[df['scanner'] == 'U']
+    df_U_idx = df[df['scanner'] == 'U'].index.to_list()
+    sublists_U = split(h_length, df_U, df_U_idx)
+    df_S = df[df['scanner'] == 'S']
+    df_S_idx = df[df['scanner'] == 'S'].index.to_list()
+    sublists_S = split(h_length, df_S, df_S_idx)
+    
+    return sublists_U[0]+sublists_S[0], sublists_U[1]+sublists_S[1]
+
+def split(h_length, df, df_idx):
+    sublists = []
+    i = 0
+    prev_index = 0
+    for l in h_length:
+        l=int(l)
+        if(i==0):
+            sublists.append(df_idx[0:l-1])
+            
+            i=i+1
+            prev_index = df_idx[l-1]
+        else:
+          
+            j=prev_index+1
+            while(df.iloc[prev_index].sub_ID==df.iloc[j].sub_ID):
+                j=j+1
+               
+            sublists.append(df_idx[j: j+l-1])
+   
+    return sublists                 
+
+
+def get_mat(name):
+    X = dcmread(name)
+    X = X.pixel_array
+    return torch.tensor(X.astype(float))            
+    
 
 def transforma():
     transform = A.Compose([A.Flip(p=0.5)], additional_targets={'image0': 'image', 'image1': 'image'})
     return transform
 
-def export_pixel_array(in_file_LD, out_file_LD, dataset_LD, in_file_FD, out_file_FD, dataset_FD):
+def export_pixel_array(in_file_LD, out_file_LD, in_file_FD, out_file_FD, dataset_name):
     LDPT = dcmread(in_file_LD).pixel_array.astype(float)
     NDPT = dcmread(in_file_FD).pixel_array.astype(float)
     transforms = transforma()
@@ -67,15 +135,15 @@ def export_pixel_array(in_file_LD, out_file_LD, dataset_LD, in_file_FD, out_file
     LDPT = transformed["image"]
     NDPT = transformed["image0"]
     #print(norm_L.size())
-    LDPT = norm_data(LDPT[4:356, 4:356])
-    NDPT = norm_data(NDPT[4:356, 4:356])
+    LDPT = norm_data(LDPT[4:356, 4:356]).astype(np.float32)
+    NDPT = norm_data(NDPT[4:356, 4:356]).astype(np.float32)
     
     h5 = h5py.File(out_file_LD)
-    h5.create_dataset(dataset_LD, data=LDPT)
+    h5.create_dataset(dataset_name, data=LDPT)
     h5.close()
     
     h5 = h5py.File(out_file_FD)
-    h5.create_dataset(dataset_FD, data=NDPT)
+    h5.create_dataset(dataset_name, data=NDPT)
     h5.close()
     
 
@@ -114,9 +182,6 @@ def ModelParamsInitHelper(m, flag):
         nn.init.constant_(m.weight, 1.0)
         nn.init.constant_(m.bias, 0)
    
-    #else:
-        #print("not")
-
 
 def ModelParamsInit(model):
     assert isinstance(model, nn.Module)
@@ -229,7 +294,7 @@ def arrange_data(params, root_dir):
                                 data = {'sub_ID': sub_ID, 'slice': sl, 'Dose': Dose, 'LDPT':LD_to, 'HDPT':HD_to}
                                 df.loc[i] = data
                                 i=i+1
-                                export_pixel_array(LD, LD_to, os.path.join(str(Dose), sub_ID, "LD", sl[0:-4]), FD, HD_to, os.path.join(str(Dose), sub_ID, "FD", sl[0:-4]))
+                                export_pixel_array(LD, LD_to, FD, HD_to, "dataset")
                             else:
                                 print('fail')
                             
@@ -294,7 +359,7 @@ def arrange_data_siemense(params, root_dir):
                                 df.loc[i] = data
                                 i=i+1
                                
-                                export_pixel_array(LD, LD_to, os.path.join(str(Dose), sub_ID, "LD", sl[0:-4]), FD, HD_to, os.path.join(str(Dose), sub_ID, "FD", sl[0:-4]))
+                                export_pixel_array(LD, LD_to, FD, HD_to, "dataset")
                             else:
                                 print('fail')
                             
@@ -303,41 +368,6 @@ def arrange_data_siemense(params, root_dir):
                         
     return df
                         
-def split(lengths, data):
-    sublists = []
-    i = 0
-    prev_index = 0
-    for l in lengths:
-        l=int(l)
-        if(i==0):
-            sublists.append(list(range(0, l-1)))
-            
-            i=i+1
-            prev_index = l-1
-        else:
-            #curr_index = l + prev_index
-            j=prev_index+1
-            while(data.iloc[prev_index].sub_ID==data.iloc[j].sub_ID):
-                j=j+1
-                #print(data.iloc[prev_index].sub_ID)
-            sublists.append(list(range(j, j+l-1)))
-   
-    return sublists                 
-
-def get_mat(name):
-    X = dcmread(name)
-    X = X.pixel_array
-    return torch.tensor(X.astype(float))            
-    
-def train_val_test_por(params, data):
-    length = len(data)
-    #my_list = list(range(1, length))
-    weight_list = params['train_val_test'] 
-    lengths = [np.ceil(i*length) for i in weight_list]
-    
-    sublists = split(lengths, data)
-    #print()
-    return sublists[0], sublists[1]
 
 def scale_data(data):
     

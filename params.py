@@ -18,7 +18,7 @@ def scan_params():
     params['multi_slice_n']= 1
     params['new_h'] = 128
     params['new_w']= 128  
-    params['train_val_test'] = [0.005,0.005] #split of pt. between train_test
+    params['train_val_test'] = [0.02,0.01] #split of pt. between train_test
     params['batch_size'] = 8
     params['ker_size'] = 3
     params['encoder_depth'] = [32,32,64]
@@ -31,7 +31,8 @@ def scan_params():
     params['num_kernels'] = 3
     params['num_of_epochs'] = 60
     #params['lr'] = [5e-4, 1e-3]
-    params['lr'] = [5e-4]
+    #params['lr'] = [5e-4] good for unet
+    params['lr'] = [1e-4]
     params['momentum'] = 0.9
     params['dropout'] = 0.2
     #params['net'] = ['unet']

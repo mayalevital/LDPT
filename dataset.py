@@ -30,8 +30,8 @@ import h5py
 
 def get_mat(name):
     X = h5py.File(name, 'r')
-    #X = X.astype(np.float32)
-    return X
+    
+    return X["dataset"].value
 
 
 class ULDPT(Dataset):
@@ -40,14 +40,14 @@ class ULDPT(Dataset):
     def __init__(self, length, data):
         
         self.length = length
-        self.data
+        self.data = data
     def __len__(self):
         return self.length
 
     def __getitem__(self,idx):
         data = self.data
         LDPT = torch.tensor(get_mat(data.iloc[idx].LDPT)).unsqueeze(0)
-        NDPT = torch.tensor(get_mat(data.iloc[idx].NDPT)).unsqueeze(0)
+        NDPT = torch.tensor(get_mat(data.iloc[idx].HDPT)).unsqueeze(0)
 
         sample = {'LDPT': LDPT, 'NDPT': NDPT}
 
