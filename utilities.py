@@ -53,6 +53,7 @@ import unet_2
 from unet_2 import fin_conv
 import albumentations as A
 import h5py
+import unetr
 
 #root_dir = ['/tcmldrive/databases/Public/uExplorer/']
 #root_dir_siemens = ['/tcmldrive/databases/Public/SiemensVisionQuadra/']
@@ -85,15 +86,19 @@ def split_df(df, params):
     length = len(df)
     weight_list = params['train_val_test'] 
     lengths = [np.ceil(i*length) for i in weight_list]
-    h_length = [np.ceil(l/2) for l in lengths]
+    #h_length = [np.ceil(l/2) for l in lengths]
+    
     df_U = df[df['scanner'] == 'U']
     df_U_idx = df[df['scanner'] == 'U'].index.to_list()
-    sublists_U = split(h_length, df_U, df_U_idx)
-    df_S = df[df['scanner'] == 'S']
-    df_S_idx = df[df['scanner'] == 'S'].index.to_list()
-    sublists_S = split(h_length, df_S, df_S_idx)
+    #sublists_U = split(h_length, df_U, df_U_idx)
+    sublists_U = split(lengths, df_U, df_U_idx)
+    #df_S = df[df['scanner'] == 'S']
+    #df_S_idx = df[df['scanner'] == 'S'].index.to_list()
+    #sublists_S = split(h_length, df_S, df_S_idx)
     
-    return sublists_U[0]+sublists_S[0], sublists_U[1]+sublists_S[1]
+     
+    #return sublists_U[0]+sublists_S[0], sublists_U[1]+sublists_S[1]
+    return sublists_U[0], sublists_U[1]
 
 def split(h_length, df, df_idx):
     sublists = []
@@ -172,13 +177,13 @@ def gradient_magnitude(x):
     
 def ModelParamsInitHelper(m, flag):
     if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)) and flag == "LeakyRELU":
-        #print("init weight LeakyRELU")
+        print("init weight LeakyRELU")
         torch.nn.init.kaiming_uniform_(m.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
     elif isinstance(m, nn.Conv2d) and flag == "Tanh":
-        #print("update weight conv Tanh")
+        print("update weight conv Tanh")
         torch.nn.init.xavier_normal_(m.weight, gain=1.0)
-    elif isinstance(m , (nn.GroupNorm, nn.LayerNorm)):
-        #print("init weight norm")
+    elif isinstance(m , (nn.GroupNorm, nn.LayerNorm, nn.InstanceNorm2d)):
+        print("init weight norm")
         nn.init.constant_(m.weight, 1.0)
         nn.init.constant_(m.bias, 0)
    
@@ -190,8 +195,10 @@ def ModelParamsInit(model):
             for name, mmm in mm.named_modules():
                 for name, mmmm in mmm.named_modules():
                     if isinstance(mmmm, (monai.networks.blocks.Convolution)):
+                        
                         for mmmmm in mmmm:
                             if isinstance(mmmmm, nn.Conv2d):
+                                print("init weight LeakyRELU")
                                 torch.nn.init.kaiming_uniform_(mmmmm.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
                             else:
                                 for mmmmmm in mmmmm:
@@ -208,13 +215,13 @@ def ModelParamsInit_unetr(model):
     assert isinstance(model, nn.Module)
     for name, m in model.named_modules():
         #print(m)
+       
         for name, mm in m.named_modules():
             for name, mmm in mm.named_modules():
-                
+                #print(mmm)
                 if isinstance(mmm, (nn.Conv2d, nn.ConvTranspose2d)):
                     ModelParamsInitHelper(mmm, "LeakyRELU")
-                    #print(mmm)
-                    #print("conv2D init")
+                    
                 
                 else:
                     for name, mmmm in mmm.named_modules():
@@ -225,7 +232,7 @@ def ModelParamsInit_unetr(model):
                                 else:
                                     for mmmmmm in mmmmm:
                                         ModelParamsInitHelper(mmmmmm, "LeakyRELU")
-                  
+              
 def save_list(l, name):
     file_name = name 
     open_file = open(file_name, "wb")

@@ -31,6 +31,7 @@ from unetr import UNETR2D
 import pytorch_ssim
 plt.ioff()
 from utilities import dataframe_paths, split_df
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 def trainloaders(data):
     _dataset = ULDPT(len(data), data)
@@ -91,6 +92,7 @@ if(t==1):
                         dropout_rate=0.2).to(device)
                         
                         ModelParamsInit_unetr(net)
+                        print("unetr")
                       
                     
                     criterion = nn.L1Loss()
@@ -98,16 +100,16 @@ if(t==1):
                         optimizer=torch.optim.RMSprop(net.parameters(), lr=learn, alpha=0.99, eps=1e-08, weight_decay=params['weight_decay'], momentum=0, centered=False)
                     if opt == 'ADAM':
                         optimizer=torch.optim.Adam(net.parameters(), lr=learn, betas=(0.9, 0.999), eps=1e-08, weight_decay=params['weight_decay'])
+                        scheduler = ReduceLROnPlateau(optimizer, 'min')
                     ssim_loss = pytorch_ssim.SSIM()
                     valid_in_ssim = []
                     valid_res_ssim = []
-                    
+                    [trainloader_1, trainloader_2] = trainloaders(data_)
                     for epoch in range(N):  # loop over the dataset multiple times
                         print('epoch ', epoch+1, ' out of ', N)
                         train_loss = []
                         valid_loss = []
-                        
-                        [trainloader_1, trainloader_2] = trainloaders(data_)
+        
                         valid_loss.append(calc_valid_loss(criterion, l, data_, device, trainloader_2))
                         running_train_loss = 0.0
                         running_g_loss = 0.0
@@ -134,11 +136,12 @@ if(t==1):
                                 loss = loss_ + loss_grad
                                 loss.backward()
                                 optimizer.step()
+                                
                                 #pull out the gradient
                                 #add the noise gaussian with alpha std
-                                running_train_loss = running_train_loss + loss.item()
-                                running_g_loss = running_g_loss + loss_grad.item()
-                                running_l1_loss = running_l1_loss + loss_.item()
+                                running_train_loss = running_train_loss + loss.detach().item()
+                                running_g_loss = running_g_loss + loss_grad.detach().item()
+                                running_l1_loss = running_l1_loss + loss_.detach().item()
                                 SSIM_LDPT_NDPT_train.append(calc_ssim(inputs.detach().cpu(), outputs.detach().cpu()))
                                 SSIM_RESU_NDPT_train.append(calc_ssim(results.detach().cpu(), outputs.detach().cpu()))
  
@@ -156,11 +159,13 @@ if(t==1):
                                 loss_grad = torch.tensor(l[1])*criterion(gradient_magnitude(outputs), gradient_magnitude(results))
                                 
                            
-                                loss_v = loss_ + loss_grad      
-                                running_valid_loss = running_valid_loss + loss_v.item()
+                                loss_v = loss_ + loss_grad 
+                                scheduler.step(loss_v)
+                                running_valid_loss = running_valid_loss + loss_v.detach().item()
                                 SSIM_LDPT_NDPT_valid.append(calc_ssim(inputs.detach().cpu(), outputs.detach().cpu()))
                                 SSIM_RESU_NDPT_valid.append(calc_ssim(results.detach().cpu(), outputs.detach().cpu()))
                          
+                            
                             print("ssim valid LDPT/NDPT", np.mean(SSIM_LDPT_NDPT_valid))
                             valid_in_ssim.append(np.mean(SSIM_LDPT_NDPT_valid))
                             print("ssim valid results/NDPT", np.mean(SSIM_RESU_NDPT_valid))
@@ -175,6 +180,7 @@ if(t==1):
                             print('[%d, %5d] validation loss: %.5f' %
                                           (epoch + 1, i + 1, running_valid_loss))
                             valid_loss.append(running_valid_loss)
+                            torch.cuda.empty_cache()
                 
                     
                     print('Finished Training')

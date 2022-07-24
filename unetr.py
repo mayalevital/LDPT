@@ -15,6 +15,7 @@ import torch.nn as nn
 from monai.networks.blocks.convolutions import Convolution
 from monai.networks.layers.factories import Act, Norm
 from monai.networks.layers.utils import get_act_layer, get_norm_layer
+#from monai.networks.blocks.dynunet_block import UnetOutBlock
 
 class UnetOutBlock(nn.Module):
     def __init__(
@@ -26,6 +27,7 @@ class UnetOutBlock(nn.Module):
         )
     def forward(self, inp):
         return self.conv(inp)
+    print('jj')
 
 def get_conv_layer(
     spatial_dims: int,

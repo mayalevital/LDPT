@@ -32,12 +32,12 @@ def scan_params():
     params['num_of_epochs'] = 60
     #params['lr'] = [5e-4, 1e-3]
     #params['lr'] = [5e-4] good for unet
-    params['lr'] = [1e-4]
+    params['lr'] = [5e-4]
     params['momentum'] = 0.9
     params['dropout'] = 0.2
-    #params['net'] = ['unet']
+   
     params['net'] = ['unetr']
-    params['weight_decay'] = 0
+    params['weight_decay'] = 1e-12
     params['gain'] = 1
     params['t'] = 1
     params['lambda'] = [[1-1e-1, 1e-1]]
