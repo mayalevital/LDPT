@@ -64,6 +64,21 @@ import unetr
 #data_U.to_pickle("./data_all.pkl", compression='infer', protocol=4)
 #data_ = pd.read_pickle("./data_all.pkl", compression='infer')
 
+def plot_im(PATH, inputs, outputs, results, i):                                
+    f, (ax1, ax2, ax3) = plt.subplots(1, 3, sharey=True)
+
+    ax1.imshow(inputs[0,0,:,:].detach().cpu())
+    ax1.set_title('LDPT')
+    
+    ax2.imshow(outputs[0,0,:,:].detach().cpu())
+    ax2.set_title('NDPT')
+    
+    ax3.imshow(results[0,0,:,:].detach().cpu())
+    ax3.set_title('NET')
+ 
+    f.savefig(os.path.join(PATH, "img" + str(i) + ".jpg"))
+    plt.close(f)
+
 def dataframe_paths(PATH):
     l=[]
     df = pd.DataFrame(columns=['sub_ID', 'slice', 'Dose', 'LDPT', 'HDPT', 'scanner'])
@@ -88,8 +103,8 @@ def split_df(df, params):
     lengths = [np.ceil(i*length) for i in weight_list]
     #h_length = [np.ceil(l/2) for l in lengths]
     
-    df_U = df[df['scanner'] == 'U']
-    df_U_idx = df[df['scanner'] == 'U'].index.to_list()
+    df_U = df
+    df_U_idx = df.index.to_list()
     #sublists_U = split(h_length, df_U, df_U_idx)
     sublists_U = split(lengths, df_U, df_U_idx)
     #df_S = df[df['scanner'] == 'S']
@@ -100,26 +115,38 @@ def split_df(df, params):
     #return sublists_U[0]+sublists_S[0], sublists_U[1]+sublists_S[1]
     return sublists_U[0], sublists_U[1]
 
-def split(h_length, df, df_idx):
+def split(lengths, data):
     sublists = []
     i = 0
     prev_index = 0
-    for l in h_length:
+    for l in lengths:
         l=int(l)
         if(i==0):
-            sublists.append(df_idx[0:l-1])
+            sublists.append(list(range(0, l-1)))
             
             i=i+1
-            prev_index = df_idx[l-1]
+            prev_index = l-1
         else:
-          
+            #curr_index = l + prev_index
             j=prev_index+1
-            while(df.iloc[prev_index].sub_ID==df.iloc[j].sub_ID):
+            while(data.iloc[prev_index].sub_ID==data.iloc[j].sub_ID):
                 j=j+1
-               
-            sublists.append(df_idx[j: j+l-1])
+                #print(data.iloc[prev_index].sub_ID)
+            sublists.append(list(range(j, j+l-1)))
    
     return sublists                 
+
+          
+    
+def train_val_test_por(params, data):
+    length = len(data)
+    #my_list = list(range(1, length))
+    weight_list = params['train_val_test'] 
+    lengths = [np.ceil(i*length) for i in weight_list]
+    
+    sublists = split(lengths, data)
+    #print()
+    return sublists[0], sublists[1]            
 
 
 def get_mat(name):
@@ -173,6 +200,7 @@ def gradient_magnitude(x):
     x_grad = kornia.filters.spatial_gradient(x, mode='diff', order=1)
     x_grad = torch.squeeze(x_grad)
     x_grad_mag = torch.sqrt(torch.square(x_grad[0]) + torch.square(x_grad[1]))
+    #x_grad_mag = torch.square(x_grad[0]) + torch.square(x_grad[1])
     return x_grad_mag
     
 def ModelParamsInitHelper(m, flag):
@@ -182,10 +210,10 @@ def ModelParamsInitHelper(m, flag):
     elif isinstance(m, nn.Conv2d) and flag == "Tanh":
         print("update weight conv Tanh")
         torch.nn.init.xavier_normal_(m.weight, gain=1.0)
-    elif isinstance(m , (nn.GroupNorm, nn.LayerNorm, nn.InstanceNorm2d)):
-        print("init weight norm")
-        nn.init.constant_(m.weight, 1.0)
-        nn.init.constant_(m.bias, 0)
+    #elif isinstance(m , (nn.GroupNorm, nn.LayerNorm, nn.InstanceNorm2d)):
+        #print("init weight norm")
+        #nn.init.constant_(m.weight, 1.0)
+        #nn.init.constant_(m.bias, 0)
    
 
 def ModelParamsInit(model):
@@ -453,10 +481,10 @@ def load_model(N, PATH, trainloader_2):
         valid_loss = load_list(os.path.join(PATH, 'valid_loss.pkl'))
         valid_in_ssim = load_list(os.path.join(PATH, 'valid_in_ssim.pkl'))
         valid_res_ssim = load_list(os.path.join(PATH, 'valid_res_ssim.pkl'))
-        print(train_loss)
-        print(valid_loss)
+        #print(train_loss)
+        #print(valid_loss)
         ax1.plot(range(0,N), train_loss, label = "training loss")
-        ax1.plot(range(0,N+1), valid_loss, label = "validation loss")
+        ax1.plot(range(0,N), valid_loss, label = "validation loss")
         ax1.set(ylabel="loss")
         ax1.legend()
         ax1.set_title("training / validation loss over epochs")
@@ -482,7 +510,7 @@ def load_model(N, PATH, trainloader_2):
             results = results[0,0,:,:].detach().cpu() 
            
 
-            if(i%100==1):
+            if(i%10==1):
                 #plot_result(np.log(results-outputs)-np.log(outputs), np.log(inputs-outputs)-np.log(outputs), np.log(results-inputs)-np.log(outputs))
                 plot_result(PATH, i, results, inputs, outputs, ssim(inputs.numpy(), outputs.numpy()), ssim(results.numpy(), outputs.numpy()))
         

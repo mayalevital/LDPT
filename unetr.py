@@ -27,7 +27,7 @@ class UnetOutBlock(nn.Module):
         )
     def forward(self, inp):
         return self.conv(inp)
-    print('jj')
+    #print('jj')
 
 def get_conv_layer(
     spatial_dims: int,
