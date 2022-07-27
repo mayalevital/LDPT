@@ -1,0 +1,773 @@
+small weight decay, un-filtered data
+unet
+learning rate= 0.0005
+grads lambda= [0.9, 0.1]
+optimizer  ADAM
+BasicUNet features: (32, 32, 32, 64, 128, 32).
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+update weight conv Tanh
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+update weight conv Tanh
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+update weight conv Tanh
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+init weight LeakyRELU
+update weight conv Tanh
+train portion size =  27388
+test portion size =  6847
+epoch  1  out of  60
+ssim valid LDPT/NDPT 0.8813368233318682
+ssim valid results/NDPT 0.91188070339166
+[1,   856] training loss: 14.62089
+[1,   856] training grad loss: 1.51599
+[1,   856] training l1 loss: 13.10489
+[1,   856] validation loss: 0.30895
+epoch  2  out of  60
+ssim valid LDPT/NDPT 0.8813338875335297
+ssim valid results/NDPT 0.9324158516926555
+[2,   856] training loss: 1.05525
+[2,   856] training grad loss: 0.06956
+[2,   856] training l1 loss: 0.98568
+[2,   856] validation loss: 0.13825
+epoch  3  out of  60
+ssim valid LDPT/NDPT 0.8813322367780685
+ssim valid results/NDPT 0.9364874605412739
+[3,   856] training loss: 0.68050
+[3,   856] training grad loss: 0.03814
+[3,   856] training l1 loss: 0.64236
+[3,   856] validation loss: 0.15211
+epoch  4  out of  60
+ssim valid LDPT/NDPT 0.8813322421021764
+ssim valid results/NDPT 0.9378311558982938
+[4,   856] training loss: 0.64176
+[4,   856] training grad loss: 0.03546
+[4,   856] training l1 loss: 0.60631
+[4,   856] validation loss: 0.17311
+epoch  5  out of  60
+ssim valid LDPT/NDPT 0.8813325887158642
+ssim valid results/NDPT 0.9396094254165066
+[5,   856] training loss: 0.60263
+[5,   856] training grad loss: 0.03173
+[5,   856] training l1 loss: 0.57090
+[5,   856] validation loss: 0.15752
+epoch  6  out of  60
+ssim valid LDPT/NDPT 0.8813327789304523
+ssim valid results/NDPT 0.9389848617914405
+[6,   856] training loss: 0.58595
+[6,   856] training grad loss: 0.03050
+[6,   856] training l1 loss: 0.55545
+[6,   856] validation loss: 0.15310
+epoch  7  out of  60
+ssim valid LDPT/NDPT 0.8813365493949358
+ssim valid results/NDPT 0.9392957977997742
+[7,   856] training loss: 0.57182
+[7,   856] training grad loss: 0.02963
+[7,   856] training l1 loss: 0.54219
+[7,   856] validation loss: 0.13181
+epoch  8  out of  60
+ssim valid LDPT/NDPT 0.8813336180598742
+ssim valid results/NDPT 0.93932084367096
+[8,   856] training loss: 0.56311
+[8,   856] training grad loss: 0.02926
+[8,   856] training l1 loss: 0.53385
+[8,   856] validation loss: 0.14583
+epoch  9  out of  60
+ssim valid LDPT/NDPT 0.8813347569273229
+ssim valid results/NDPT 0.9408726909791555
+[9,   856] training loss: 0.55649
+[9,   856] training grad loss: 0.02880
+[9,   856] training l1 loss: 0.52770
+[9,   856] validation loss: 0.13708
+epoch  10  out of  60
+ssim valid LDPT/NDPT 0.8813382979429761
+ssim valid results/NDPT 0.9401516207926823
+[10,   856] training loss: 0.55327
+[10,   856] training grad loss: 0.02858
+[10,   856] training l1 loss: 0.52469
+[10,   856] validation loss: 0.15668
+epoch  11  out of  60
+ssim valid LDPT/NDPT 0.8813366741489558
+ssim valid results/NDPT 0.9407866761123842
+[11,   856] training loss: 0.54642
+[11,   856] training grad loss: 0.02820
+[11,   856] training l1 loss: 0.51822
+[11,   856] validation loss: 0.12243
+epoch  12  out of  60
+ssim valid LDPT/NDPT 0.8813336567061275
+ssim valid results/NDPT 0.9392357376972923
+[12,   856] training loss: 0.53818
+[12,   856] training grad loss: 0.02783
+[12,   856] training l1 loss: 0.51035
+[12,   856] validation loss: 0.13584
+epoch  13  out of  60
+ssim valid LDPT/NDPT 0.8813320050863855
+ssim valid results/NDPT 0.9374670054530876
+[13,   856] training loss: 0.53624
+[13,   856] training grad loss: 0.02759
+[13,   856] training l1 loss: 0.50865
+[13,   856] validation loss: 0.13742
+epoch  14  out of  60
+ssim valid LDPT/NDPT 0.881335622758265
+ssim valid results/NDPT 0.9314407609639741
+[14,   856] training loss: 0.53438
+[14,   856] training grad loss: 0.02740
+[14,   856] training l1 loss: 0.50698
+[14,   856] validation loss: 0.13229
+epoch  15  out of  60
+ssim valid LDPT/NDPT 0.8813360047074738
+ssim valid results/NDPT 0.9402555004934792
+[15,   856] training loss: 0.52694
+[15,   856] training grad loss: 0.02726
+[15,   856] training l1 loss: 0.49969
+[15,   856] validation loss: 0.13066
+epoch  16  out of  60
+ssim valid LDPT/NDPT 0.8813301279113301
+ssim valid results/NDPT 0.9416940084889439
+[16,   856] training loss: 0.52835
+[16,   856] training grad loss: 0.02729
+[16,   856] training l1 loss: 0.50106
+[16,   856] validation loss: 0.14074
+epoch  17  out of  60
+ssim valid LDPT/NDPT 0.8813325967966983
+ssim valid results/NDPT 0.9347896957255207
+[17,   856] training loss: 0.52208
+[17,   856] training grad loss: 0.02721
+[17,   856] training l1 loss: 0.49488
+[17,   856] validation loss: 0.12894
+epoch  18  out of  60
+ssim valid LDPT/NDPT 0.8813335528403252
+ssim valid results/NDPT 0.9400794504880187
+[18,   856] training loss: 0.52123
+[18,   856] training grad loss: 0.02689
+[18,   856] training l1 loss: 0.49434
+[18,   856] validation loss: 0.12696
+epoch  19  out of  60
+ssim valid LDPT/NDPT 0.8813336385721643
+ssim valid results/NDPT 0.9388291130936676
+[19,   856] training loss: 0.52030
+[19,   856] training grad loss: 0.02701
+[19,   856] training l1 loss: 0.49329
+[19,   856] validation loss: 0.11882
+epoch  20  out of  60
+ssim valid LDPT/NDPT 0.8813350062486174
+ssim valid results/NDPT 0.9402603401567745
+[20,   856] training loss: 0.51781
+[20,   856] training grad loss: 0.02669
+[20,   856] training l1 loss: 0.49112
+[20,   856] validation loss: 0.12370
+epoch  21  out of  60
+ssim valid LDPT/NDPT 0.8813269691584202
+ssim valid results/NDPT 0.940900148267266
+[21,   856] training loss: 0.51890
+[21,   856] training grad loss: 0.02702
+[21,   856] training l1 loss: 0.49188
+[21,   856] validation loss: 0.12373
+epoch  22  out of  60
+ssim valid LDPT/NDPT 0.881330801150558
+ssim valid results/NDPT 0.937235313703281
+[22,   856] training loss: 0.50871
+[22,   856] training grad loss: 0.02660
+[22,   856] training l1 loss: 0.48211
+[22,   856] validation loss: 0.13308
+epoch  23  out of  60
+ssim valid LDPT/NDPT 0.8813340506688833
+ssim valid results/NDPT 0.9396410472803277
+[23,   856] training loss: 0.50915
+[23,   856] training grad loss: 0.02651
+[23,   856] training l1 loss: 0.48264
+[23,   856] validation loss: 0.12446
+epoch  24  out of  60
+ssim valid LDPT/NDPT 0.8813326277967601
+ssim valid results/NDPT 0.9402975623224811
+[24,   856] training loss: 0.50547
+[24,   856] training grad loss: 0.02630
+[24,   856] training l1 loss: 0.47917
+[24,   856] validation loss: 0.12893
+epoch  25  out of  60
+ssim valid LDPT/NDPT 0.8813324757299722
+ssim valid results/NDPT 0.9375385778609342
+[25,   856] training loss: 0.50849
+[25,   856] training grad loss: 0.02641
+[25,   856] training l1 loss: 0.48208
+[25,   856] validation loss: 0.15209
+epoch  26  out of  60
+ssim valid LDPT/NDPT 0.8813342278642302
+ssim valid results/NDPT 0.9352158369447979
+[26,   856] training loss: 0.50718
+[26,   856] training grad loss: 0.02639
+[26,   856] training l1 loss: 0.48079
+[26,   856] validation loss: 0.18295
+epoch  27  out of  60
+ssim valid LDPT/NDPT 0.88133420911838
+ssim valid results/NDPT 0.9355187036026787
+[27,   856] training loss: 0.50436
+[27,   856] training grad loss: 0.02621
+[27,   856] training l1 loss: 0.47815
+[27,   856] validation loss: 0.13370
+epoch  28  out of  60
+ssim valid LDPT/NDPT 0.8813335166939397
+ssim valid results/NDPT 0.939871746926505
+[28,   856] training loss: 0.50707
+[28,   856] training grad loss: 0.02632
+[28,   856] training l1 loss: 0.48075
+[28,   856] validation loss: 0.12168
+epoch  29  out of  60
+ssim valid LDPT/NDPT 0.8813391121435616
+ssim valid results/NDPT 0.9391808446294031
+[29,   856] training loss: 0.50609
+[29,   856] training grad loss: 0.02627
+[29,   856] training l1 loss: 0.47982
+[29,   856] validation loss: 0.15975
+epoch  30  out of  60
+ssim valid LDPT/NDPT 0.8813362207770663
+ssim valid results/NDPT 0.9411131557309286
+[30,   856] training loss: 0.50033
+[30,   856] training grad loss: 0.02623
+[30,   856] training l1 loss: 0.47410
+[30,   856] validation loss: 0.12991
+epoch  31  out of  60
+ssim valid LDPT/NDPT 0.8813332586410779
+ssim valid results/NDPT 0.9404663087650621
+[31,   856] training loss: 0.49597
+[31,   856] training grad loss: 0.02604
+[31,   856] training l1 loss: 0.46993
+[31,   856] validation loss: 0.14708
+epoch  32  out of  60
+ssim valid LDPT/NDPT 0.8813343930985034
+ssim valid results/NDPT 0.941994435511375
+[32,   856] training loss: 0.50083
+[32,   856] training grad loss: 0.02614
+[32,   856] training l1 loss: 0.47470
+[32,   856] validation loss: 0.13304
+epoch  33  out of  60
+ssim valid LDPT/NDPT 0.8813327744065413
+ssim valid results/NDPT 0.941531523857456
+[33,   856] training loss: 0.49066
+[33,   856] training grad loss: 0.02574
+[33,   856] training l1 loss: 0.46492
+[33,   856] validation loss: 0.12379
+epoch  34  out of  60
+ssim valid LDPT/NDPT 0.8813336859152214
+ssim valid results/NDPT 0.935258360705006
+[34,   856] training loss: 0.49689
+[34,   856] training grad loss: 0.02593
+[34,   856] training l1 loss: 0.47095
+[34,   856] validation loss: 0.12576
+epoch  35  out of  60
+ssim valid LDPT/NDPT 0.8813344524238313
+ssim valid results/NDPT 0.940998523041353
+[35,   856] training loss: 0.49708
+[35,   856] training grad loss: 0.02589
+[35,   856] training l1 loss: 0.47119
+[35,   856] validation loss: 0.13664
+epoch  36  out of  60
+ssim valid LDPT/NDPT 0.8813302558664036
+ssim valid results/NDPT 0.9398570747230811
+[36,   856] training loss: 0.49931
+[36,   856] training grad loss: 0.02563
+[36,   856] training l1 loss: 0.47368
+[36,   856] validation loss: 0.14393
+epoch  37  out of  60
+ssim valid LDPT/NDPT 0.8813359441321056
+ssim valid results/NDPT 0.9404067987866126
+[37,   856] training loss: 0.49191
+[37,   856] training grad loss: 0.02584
+[37,   856] training l1 loss: 0.46606
+[37,   856] validation loss: 0.12840
+epoch  38  out of  60
+ssim valid LDPT/NDPT 0.8813343084101652
+ssim valid results/NDPT 0.9403648122339466
+[38,   856] training loss: 0.49159
+[38,   856] training grad loss: 0.02575
+[38,   856] training l1 loss: 0.46584
+[38,   856] validation loss: 0.13523
+epoch  39  out of  60
+ssim valid LDPT/NDPT 0.881330546283232
+ssim valid results/NDPT 0.9377980815857547
+[39,   856] training loss: 0.48855
+[39,   856] training grad loss: 0.02567
+[39,   856] training l1 loss: 0.46288
+[39,   856] validation loss: 0.14459
+epoch  40  out of  60
+ssim valid LDPT/NDPT 0.8813299709659596
+ssim valid results/NDPT 0.940901373010715
+[40,   856] training loss: 0.49103
+[40,   856] training grad loss: 0.02554
+[40,   856] training l1 loss: 0.46550
+[40,   856] validation loss: 0.13511
+epoch  41  out of  60
+ssim valid LDPT/NDPT 0.8813341142172998
+ssim valid results/NDPT 0.9374261301931982
+[41,   856] training loss: 0.48854
+[41,   856] training grad loss: 0.02568
+[41,   856] training l1 loss: 0.46286
+[41,   856] validation loss: 0.12374
+epoch  42  out of  60
+ssim valid LDPT/NDPT 0.8813250574242611
+ssim valid results/NDPT 0.9404548633110483
+[42,   856] training loss: 0.48787
+[42,   856] training grad loss: 0.02534
+[42,   856] training l1 loss: 0.46253
+[42,   856] validation loss: 0.13630
+epoch  43  out of  60
+ssim valid LDPT/NDPT 0.8813227976448328
+ssim valid results/NDPT 0.9369805279030691
+[43,   856] training loss: 0.48726
+[43,   856] training grad loss: 0.02547
+[43,   856] training l1 loss: 0.46179
+[43,   856] validation loss: 0.14927
+epoch  44  out of  60
+ssim valid LDPT/NDPT 0.8813346192003624
+ssim valid results/NDPT 0.9372429964265906
+[44,   856] training loss: 0.48653
+[44,   856] training grad loss: 0.02551
+[44,   856] training l1 loss: 0.46102
+[44,   856] validation loss: 0.12414
+epoch  45  out of  60
+ssim valid LDPT/NDPT 0.8813300679982601
+ssim valid results/NDPT 0.9395720889219621
+[45,   856] training loss: 0.48634
+[45,   856] training grad loss: 0.02539
+[45,   856] training l1 loss: 0.46094
+[45,   856] validation loss: 0.12377
+epoch  46  out of  60
+ssim valid LDPT/NDPT 0.8813325992119494
+ssim valid results/NDPT 0.9351111283427287
+[46,   856] training loss: 0.48490
+[46,   856] training grad loss: 0.02530
+[46,   856] training l1 loss: 0.45960
+[46,   856] validation loss: 0.12880
+epoch  47  out of  60
+ssim valid LDPT/NDPT 0.8813344393642023
+ssim valid results/NDPT 0.9400379336688344
+[47,   856] training loss: 0.48935
+[47,   856] training grad loss: 0.02529
+[47,   856] training l1 loss: 0.46407
+[47,   856] validation loss: 0.14189
+epoch  48  out of  60
+ssim valid LDPT/NDPT 0.8813308176461914
+ssim valid results/NDPT 0.9368749159924172
+[48,   856] training loss: 0.48948
+[48,   856] training grad loss: 0.02531
+[48,   856] training l1 loss: 0.46417
+[48,   856] validation loss: 0.13808
+epoch  49  out of  60
+ssim valid LDPT/NDPT 0.8813265145205583
+ssim valid results/NDPT 0.9355631105325593
+[49,   856] training loss: 0.48078
+[49,   856] training grad loss: 0.02540
+[49,   856] training l1 loss: 0.45538
+[49,   856] validation loss: 0.14289
+epoch  50  out of  60
+ssim valid LDPT/NDPT 0.8813386871871137
+ssim valid results/NDPT 0.9417239142603437
+[50,   856] training loss: 0.48681
+[50,   856] training grad loss: 0.02526
+[50,   856] training l1 loss: 0.46156
+[50,   856] validation loss: 0.13352
+epoch  51  out of  60
+ssim valid LDPT/NDPT 0.8813341236215748
+ssim valid results/NDPT 0.9419769649955358
+[51,   856] training loss: 0.48250
+[51,   856] training grad loss: 0.02546
+[51,   856] training l1 loss: 0.45704
+[51,   856] validation loss: 0.13072
+epoch  52  out of  60
+ssim valid LDPT/NDPT 0.8813352162311262
+ssim valid results/NDPT 0.9419313129053279
+[52,   856] training loss: 0.48071
+[52,   856] training grad loss: 0.02512
+[52,   856] training l1 loss: 0.45559
+[52,   856] validation loss: 0.12663
+epoch  53  out of  60
+ssim valid LDPT/NDPT 0.8813334698678774
+ssim valid results/NDPT 0.9413739938571497
+[53,   856] training loss: 0.47800
+[53,   856] training grad loss: 0.02511
+[53,   856] training l1 loss: 0.45289
+[53,   856] validation loss: 0.13825
+epoch  54  out of  60
+ssim valid LDPT/NDPT 0.8813267503271334
+ssim valid results/NDPT 0.9403107958033381
+[54,   856] training loss: 0.48384
+[54,   856] training grad loss: 0.02533
+[54,   856] training l1 loss: 0.45851
+[54,   856] validation loss: 0.14726
+epoch  55  out of  60
+ssim valid LDPT/NDPT 0.8813309123829942
+ssim valid results/NDPT 0.940653223936067
+[55,   856] training loss: 0.47945
+[55,   856] training grad loss: 0.02535
+[55,   856] training l1 loss: 0.45411
+[55,   856] validation loss: 0.13667
+epoch  56  out of  60
+ssim valid LDPT/NDPT 0.8813313489532019
+ssim valid results/NDPT 0.9385342078701469
+[56,   856] training loss: 0.48250
+[56,   856] training grad loss: 0.02532
+[56,   856] training l1 loss: 0.45718
+[56,   856] validation loss: 0.12480
+epoch  57  out of  60
+ssim valid LDPT/NDPT 0.88133564042841
+ssim valid results/NDPT 0.9414320919353835
+[57,   856] training loss: 0.48251
+[57,   856] training grad loss: 0.02512
+[57,   856] training l1 loss: 0.45740
+[57,   856] validation loss: 0.12913
+epoch  58  out of  60
+ssim valid LDPT/NDPT 0.8813377959317279
+ssim valid results/NDPT 0.938677321272975
+[58,   856] training loss: 0.47960
+[58,   856] training grad loss: 0.02523
+[58,   856] training l1 loss: 0.45437
+[58,   856] validation loss: 0.15147
+epoch  59  out of  60
+ssim valid LDPT/NDPT 0.8813376855228094
+ssim valid results/NDPT 0.943124283399522
+[59,   856] training loss: 0.47834
+[59,   856] training grad loss: 0.02507
+[59,   856] training l1 loss: 0.45327
+[59,   856] validation loss: 0.12302
+epoch  60  out of  60
+ssim valid LDPT/NDPT 0.8813341522395611
+ssim valid results/NDPT 0.9408036904911191
+[60,   856] training loss: 0.48080
+[60,   856] training grad loss: 0.02511
+[60,   856] training l1 loss: 0.45568
+[60,   856] validation loss: 0.14429
+Finished Training
