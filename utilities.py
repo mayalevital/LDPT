@@ -54,15 +54,155 @@ from unet_2 import fin_conv
 import albumentations as A
 import h5py
 import unetr
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from pytorch_msssim import ms_ssim
+ 
+def save_images(df_return, out_dirs):
+  
+     if not os.path.exists(out_dirs):
+            os.makedirs(out_dirs)
+     for index, row in df_return.iterrows():
+        #print(row['std'])
+       
+   
+        f, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, sharey=True)
+    
+        ax1.imshow(row['LDPT'])
+        ax1.set_title('LDPT')
+        
+        ax2.imshow(row['NDPT'])
+        ax2.set_title('NDPT')
+                      #, SSIM ' + str(calc_ssim(row['LDPT'], row['NDPT'])))
+        
+        ax3.imshow(row['std'])
+        ax3.set_title('std')
+        
+        ax4.imshow(row['mean'])
+        ax4.set_title('mean')
+                      #', SSIM '+ str(calc_ssim(row['mean'], row['NDPT'])))
 
-#root_dir = ['/tcmldrive/databases/Public/uExplorer/']
-#root_dir_siemens = ['/tcmldrive/databases/Public/SiemensVisionQuadra/']
-#data_siemens = arrange_data_siemense(params, root_dir_siemens)
-#data_U = arrange_data(params, root_dir)
+        f.savefig(os.path.join(out_dirs, "img" + str(row['idx']) + ".jpg"))
+        plt.close(f)
+    
+def dict_mean(df, i):
+    df_return = pd.DataFrame(columns=['LDPT', 'NDPT', 'idx', 'mean', 'std', 'ssim_0', 'ssim_net'])
+   
+    mean = df['NET'].to_numpy().mean(axis=0) 
+    std = df['NET'].to_numpy().std(axis=0)
+  
+    ssim_0 = ssim(stand_data(torch.tensor(df.iloc[0].LDPT)).numpy(), stand_data(torch.tensor(df.iloc[0].NDPT)).numpy())
+    ssim_net = ssim(stand_data(torch.tensor(mean)).numpy(), stand_data(torch.tensor(df.iloc[0].NDPT)).numpy())
+    data = {'LDPT': df.iloc[0].LDPT, 'NDPT': df.iloc[0].NDPT, 'idx':i, 'mean': mean, 'std':std, 'ssim_0':ssim_0, 'ssim_net':ssim_net}
+    df_return.loc[0] = data
+    
+    return df_return
 
-#data = data_U.append(data_siemens, ignore_index=True)
-#data_U.to_pickle("./data_all.pkl", compression='infer', protocol=4)
-#data_ = pd.read_pickle("./data_all.pkl", compression='infer')
+def train_test_net(trainloader_1, trainloader_2, network, N_finish, N, params, alpha, learn, method, optimizer, criterion, net, device, l, wd):
+   
+    scheduler = ReduceLROnPlateau(optimizer, 'min')
+    valid_in_ssim = []
+    valid_res_ssim = []
+             
+    valid_loss = []
+    train_loss = []
+    
+    split = np.linspace(0, len(trainloader_1), int(len(trainloader_1)/428)+1)
+    split = split[1:]
+   
+    print(split)
+    for epoch in range(N):
+        print('epoch ', epoch+1, ' out of ', N)
+        i=0
+        iterator=iter(trainloader_1)
+        for spl in split:
+
+            running_train_loss = 0.0
+            running_g_loss = 0.0
+            running_l1_loss = 0.0
+            SSIM_LDPT_NDPT_train = []
+            SSIM_RESU_NDPT_train = []
+            SSIM_LDPT_NDPT_valid = []
+            SSIM_RESU_NDPT_valid = []
+							
+            net.train()
+            while(i<=int(spl)-1):
+
+                data_train = next(iterator)
+                i=i+1
+                inputs = data_train['LDPT'].to(device)
+                outputs = data_train['NDPT'].to(device)
+            
+                optimizer.zero_grad()
+                results = net(inputs)
+                l1_train = torch.tensor(l[0])*criterion(results, outputs)
+                grad_train = torch.tensor(l[1])*criterion(gradient_magnitude(results), gradient_magnitude(outputs)) #+ torch.tensor(l[2])*criterion(laplacian_filter(results,3), laplacian_filter(outputs,3))
+                #print(scale_for_ssim(outputs).size())
+                #ssim_train = torch.tensor(l[3])*(1-ms_ssim(scale_for_ssim(results), scale_for_ssim(outputs), data_range=1, size_average=False).mean())
+                #print(ssim_train.item())
+                ssim_value = 1 - calc_ssim(results.detach().cpu(), outputs.detach().cpu())
+                if ssim_value > 0.05:
+                    loss_train = l1_train + grad_train #+ ssim_train
+                    loss_train.backward()
+                    optimizer.step()
+                    if method == 'SGLD':
+                        for parameters in net.parameters():
+                            parameters.grad += torch.tensor(learn*alpha).to(device, non_blocking=True)*torch.randn(parameters.grad.shape).to(device, non_blocking=True)						
+                    running_train_loss = running_train_loss + loss_train.item()
+                    running_g_loss = running_g_loss + grad_train.item()
+                    running_l1_loss = running_l1_loss + l1_train.item()
+                    SSIM_LDPT_NDPT_train.append(calc_ssim(inputs.detach().cpu(), outputs.detach().cpu()))
+                    SSIM_RESU_NDPT_train.append(calc_ssim(results.detach().cpu(), outputs.detach().cpu()))
+       
+            running_valid_loss = 0.0
+    		
+            with torch.no_grad():
+                net.eval()
+                for i_t, data_val in enumerate(trainloader_2, 0):
+                    inputs = data_val['LDPT'].to(device)   
+                    outputs = data_val['NDPT'].to(device)
+                    results = net(inputs)
+                    l1_val = torch.tensor(l[0])*criterion(outputs, results)
+                    grad_val = torch.tensor(l[1])*criterion(gradient_magnitude(outputs), gradient_magnitude(results)) #+ torch.tensor(l[2])*criterion(laplacian_filter(results,5), laplacian_filter(outputs,5))
+                    #ssim_val = torch.tensor(l[3])*(1-ms_ssim(scale_for_ssim(results), scale_for_ssim(outputs), data_range=1, size_average=False).mean())
+                    loss_val = l1_val + grad_val 
+                        
+                    								
+                    running_valid_loss = running_valid_loss + loss_val.item()
+                    SSIM_LDPT_NDPT_valid.append(calc_ssim(inputs.detach().cpu(), outputs.detach().cpu()))
+                    SSIM_RESU_NDPT_valid.append(calc_ssim(results.detach().cpu(), outputs.detach().cpu()))
+			
+                scheduler.step(running_valid_loss)	
+                print("learning rate = ", scheduler._last_lr)	           
+                print("ssim valid LDPT/NDPT", np.mean(SSIM_LDPT_NDPT_valid))
+			
+                valid_in_ssim.append(np.mean(SSIM_LDPT_NDPT_valid))
+			
+                print("ssim valid results/NDPT", np.mean(SSIM_RESU_NDPT_valid))
+                valid_res_ssim.append(np.mean(SSIM_RESU_NDPT_valid))
+                print('[%d, %5d] training loss: %.5f' %
+                						  (epoch + 1, i, running_train_loss))
+                print('[%d, %5d] training grad loss: %.5f' %
+                						  (epoch + 1, i, running_g_loss))
+                print('[%d, %5d] training l1 loss: %.5f' %
+                						  (epoch + 1, i, running_l1_loss))
+                train_loss.append(running_train_loss)
+                print('[%d, %5d] validation loss: %.5f' %
+                						  (epoch + 1, i, running_valid_loss))
+             
+            
+                valid_loss.append(running_valid_loss)
+               
+                if N - epoch <= N_finish:
+                    PATH_last_models = os.path.join('Experiments_fin', method, network + '_' + str(params['num_of_epochs']) + "_epochs_" + str(learn) + "_lr_" + str(l) + "grad_loss_lambda" + 'weight_decay' + str(wd), 'epoch_'+str(epoch+1)+'_iter_'+str(i))
+                    if not os.path.exists(PATH_last_models):
+                        os.makedirs(PATH_last_models)
+                    save_run(PATH_last_models, net, train_loss, valid_loss, valid_in_ssim, valid_res_ssim)
+                    load_model(epoch+1, PATH_last_models, trainloader_2)   
+			
+               
+    print('Finished Training')
+
+
 
 def plot_im(PATH, inputs, outputs, results, i):                                
     f, (ax1, ax2, ax3) = plt.subplots(1, 3, sharey=True)
@@ -199,16 +339,22 @@ def calc_valid_loss(criterion, l, data, device, trainloader_2):
 def gradient_magnitude(x):
     x_grad = kornia.filters.spatial_gradient(x, mode='diff', order=1)
     x_grad = torch.squeeze(x_grad)
-    x_grad_mag = torch.sqrt(torch.square(x_grad[0]) + torch.square(x_grad[1]))
+    x_grad_mag = torch.sqrt(torch.tensor(1e-12)+torch.square(x_grad[0]) + torch.square(x_grad[1]))
     #x_grad_mag = torch.square(x_grad[0]) + torch.square(x_grad[1])
     return x_grad_mag
+
+def laplacian_filter(x, kernel_size):
+    #print(x.size())
+    x_lap = kornia.filters.laplacian(x, kernel_size)
+    #print(x_lap.size())
+    return x_lap
     
 def ModelParamsInitHelper(m, flag):
     if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)) and flag == "LeakyRELU":
-        print("init weight LeakyRELU")
+        #print("init weight LeakyRELU")
         torch.nn.init.kaiming_uniform_(m.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
     elif isinstance(m, nn.Conv2d) and flag == "Tanh":
-        print("update weight conv Tanh")
+        #print("update weight conv Tanh")
         torch.nn.init.xavier_normal_(m.weight, gain=1.0)
     #elif isinstance(m , (nn.GroupNorm, nn.LayerNorm, nn.InstanceNorm2d)):
         #print("init weight norm")
@@ -226,7 +372,7 @@ def ModelParamsInit(model):
                         
                         for mmmmm in mmmm:
                             if isinstance(mmmmm, nn.Conv2d):
-                                print("init weight LeakyRELU")
+                                #print("init weight LeakyRELU")
                                 torch.nn.init.kaiming_uniform_(mmmmm.weight, a=0, mode='fan_in', nonlinearity='leaky_relu')
                             else:
                                 for mmmmmm in mmmmm:
@@ -417,6 +563,11 @@ def scale_data(data):
    
     return data
 
+def scale_for_ssim(data):
+    if(torch.max(data)!=0):
+        data = (data-torch.min(data))/(torch.max(data)-torch.min(data))
+    return data
+
 def stand_data(data):
     
     if(torch.std(data)==0):
@@ -483,15 +634,15 @@ def load_model(N, PATH, trainloader_2):
         valid_res_ssim = load_list(os.path.join(PATH, 'valid_res_ssim.pkl'))
         #print(train_loss)
         #print(valid_loss)
-        ax1.plot(range(0,N), train_loss, label = "training loss")
-        ax1.plot(range(0,N), valid_loss, label = "validation loss")
+        ax1.plot(range(0,len(train_loss)), train_loss, label = "training loss")
+        ax1.plot(range(0,len(valid_loss)), valid_loss, label = "validation loss")
         ax1.set(ylabel="loss")
         ax1.legend()
         ax1.set_title("training / validation loss over epochs")
         #axs[0].savefig(PATH + "train_valid_loss" + ".jpg")
         
-        ax2.plot(range(0,N), valid_in_ssim, label = "LDPT/NDPT ssim")
-        ax2.plot(range(0,N), valid_res_ssim, label = "result/NDPT ssim")
+        ax2.plot(range(0,len(valid_in_ssim)), valid_in_ssim, label = "LDPT/NDPT ssim")
+        ax2.plot(range(0,len(valid_res_ssim)), valid_res_ssim, label = "result/NDPT ssim")
         ax2.set(ylabel="ssim")
         ax2.legend()
         ax2.set_title("validation ssim over epochs")
