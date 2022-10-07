@@ -7,56 +7,170 @@ Created on Thu Mar 18 14:49:10 2021
 """
 import torch
 import matplotlib.pyplot as plt
-#from matplotlib_scalebar.scalebar import ScaleBar
 import numpy as np
 from skimage.metrics import structural_similarity as ssim
-#from pydicom import dcmread
-import numpy as np
-import SimpleITK as sitk
 
-import numpy as np
-#from ipywidgets import interact, fixed
-
-import matplotlib.pyplot as plt
-#%matplotlib inline
 import pandas as pd
-import math
 
 import os
-import torch
 import torch.nn
-#import torch.nn.functional as F
-from torch.utils.data import Dataset
+
 import matplotlib
-import matplotlib.pyplot as plt
 matplotlib.use('agg')
 import warnings
 warnings.filterwarnings("ignore")
 plt.ioff()   # interactive mode
-from skimage.metrics import structural_similarity as ssim
 
 import albumentations as A
-import gdcm
 from pydicom import dcmread
-import numpy as np
 import pickle
 import torch.nn as nn
-#import torch.functional.nn as F
-from timm.models.layers import trunc_normal_
 
 import kornia
 import torch
-from torch import Tensor
 import monai
-from monai.networks.blocks import Convolution
 import unet_2
-from unet_2 import fin_conv
-import albumentations as A
+
 import h5py
-import unetr
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from pytorch_msssim import ms_ssim
- 
+
+from glob import glob
+import nibabel as nib
+from skimage.metrics import structural_similarity as compare_ssim
+from IPython.display import display
+
+
+torch.set_printoptions(precision=10)
+
+def SUV_convert(result_fin, meta_data_path, file):
+    info = pd.read_csv(meta_data_path)
+    print('file', file)
+    weight = info[info.PID==file].weight
+    dose = info[info.PID==file].dose
+    
+    ratio = int(dose)/int(weight)
+    #print(ratio)
+    res = result_fin/ratio
+    return res
+
+
+def enable_dropout(model):
+    for m in model.modules():
+        if m.__class__.__name__.startswith('Dropout'):
+            #print("yes")
+            m.train()  
+
+
+def get_data_ready(data, device, compare):
+    
+    if compare == 'new':
+        inputs = data['LDPT'].to(device)
+        outputs = data['Real']
+        LD_Real = data['LD_Real']
+    
+    if compare == 'old':
+        inputs = norm_data(data['LD_Real']).to(device)
+        outputs = data['Real']
+        LD_Real = data['LD_Real']
+    
+    return inputs, outputs, LD_Real
+
+def get_NET_ready(NET_, compare, scale, LD_Real):
+    
+    if compare == 'new':
+        NET = scale*NET_
+    
+    if compare == 'old':
+        NET = un_norm_old(NET_, LD_Real)
+        
+    return NET
+
+def results_summary(trainloader_2, N_fin, device, PATH, dose, scale, compare):
+    #
+
+    df = pd.DataFrame(columns=['method', 'LDPT', 'NDPT', 'idx', 'mean', 'std', 'SSIM0', 'SSIM', 'PSNR', 'NRMSE'])
+    k=0
+   
+    for i, data in enumerate(trainloader_2, 0):
+        
+        [inputs, outputs, LD_Real] = get_data_ready(data, device, compare)
+        if outputs.max()!=0 and inputs.max()!=0:
+            f, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
+     
+            for direct in os.listdir(PATH):
+                
+                if direct == 'SGLD':
+                    #print(direct)
+                    j=0
+                    df_SGLD = pd.DataFrame(columns=['method', 'epoch', 'idx', 'LDPT', 'NDPT', 'NET'])
+                    for epoch_test in os.listdir(os.path.join(PATH, direct)):
+                        for epoch_num in os.listdir(os.path.join(PATH, direct, epoch_test)):
+                            l = len(os.listdir(os.path.join(PATH, direct, epoch_test)))
+                            path = os.path.join(os.path.join(PATH, direct, epoch_test, epoch_num), 'net.pt')
+                            if os.path.isfile(path) and j<N_fin:
+                                net = torch.load(path).to(device)
+                                net.eval()
+                                NET_ = net(inputs).detach().cpu()
+                                NET = get_NET_ready(NET_, compare, scale, LD_Real)
+                                temp = {'method': direct, 'epoch': epoch_num, 'idx': i, 'LDPT':LD_Real.squeeze().numpy(), 'NDPT':outputs.squeeze().numpy(), 'NET':NET.squeeze().numpy()}
+                                df_SGLD.loc[j] = temp
+                                j=j+1
+                               
+                        df_return  = dict_mean(df_SGLD, i)
+                        #print(df_return['SSIM'])
+                        #print(len(df_SGLD))
+                        temp = {'method': direct, 'LDPT':LD_Real.squeeze().numpy(), 'NDPT':outputs.squeeze().numpy(), 'idx':i, 'mean':df_return['mean'], 'std':df_return['std'], 'SSIM0':df_return['SSIM0'], 'SSIM':df_return['SSIM'], 'PSNR':df_return['PSNR'], 'NRMSE':df_return['NRMSE']}
+                        df.loc[k] = temp
+                        k=k+1
+                        out_dirs = os.path.join(PATH, direct, epoch_test, 'STD_maps_recon', str(dose), str(N_fin)+'iters')
+                        save_images(df_return, out_dirs)
+                        std_ = df_return['std'].iloc[0]
+                        ax1.imshow(std_)
+                        ax1.set_title('SGLD\n min=' + str(format(std_.min(), '.2E')) + 'max=' + str(format(std_.max(), '.2E')))
+       
+                if direct == 'standard':
+                    for epoch_test in os.listdir(os.path.join(PATH, direct)):
+                            epoch_num = os.listdir(os.path.join(PATH, direct, epoch_test))[-1]
+                            df_standard = pd.DataFrame(columns=['method', 'epoch', 'idx', 'LDPT', 'NDPT', 'NET'])
+                            path = os.path.join(os.path.join(PATH, direct, epoch_test, epoch_num), 'net.pt')
+                            if os.path.isfile(path):
+                                for j in range(0, N_fin):
+                                    net = torch.load(path).to(device)         
+                                    net.eval()
+                                    enable_dropout(net)
+                                    NET = scale*net(inputs).detach().cpu()
+                                    temp = {'method': direct, 'epoch': j, 'idx': i, 'LDPT':LD_Real.squeeze().numpy(), 'NDPT':outputs.squeeze().numpy(), 'NET':NET.squeeze()}
+                                    df_standard.loc[j] = temp
+        
+                            df_return = dict_mean(df_standard, i)
+                            #print(len(df_standard))
+                            temp = {'method': direct, 'LDPT':LD_Real.squeeze().numpy(), 'NDPT':outputs.squeeze().numpy(), 'idx':i, 'mean':df_return['mean'], 'std':df_return['std'], 'SSIM0':df_return['SSIM0'], 'SSIM':df_return['SSIM'], 'PSNR':df_return['PSNR'], 'NRMSE':df_return['NRMSE']}
+                            df.loc[k] = temp
+                            k=k+1
+                            out_dirs = os.path.join(PATH, direct, epoch_test, epoch_num, 'STD_maps_recon', str(dose), str(N_fin)+'iters')
+                            save_images(df_return, out_dirs)
+                            std_ = df_return['std'].iloc[0]
+                            ax2.imshow(std_)
+                            ax2.set_title('Dropout\n min=' + str(format(std_.min(), '.2E')) + 'max=' + str(format(std_.max(), '.2E')))
+                            if_no_dir_mkdir(os.path.join(PATH, "STD maps", str(dose), str(N_fin) + 'iters'))
+                            f.savefig(os.path.join(PATH, "STD maps", str(dose), str(N_fin) + 'iters', "img" + str(i) + ".jpg"))
+                            plt.close(f)
+                    
+    df.to_pickle(os.path.join(PATH, str(dose) + 'DRF' + str(N_fin) + 'iters' + 'results.pkl'), compression='infer', protocol=5, storage_options=None)
+    B = df.groupby("method")["SSIM"].apply(lambda x: np.mean([*x], axis=0))
+    print("number of iters ", str(N_fin))
+    print("dose ",str(dose))
+    print(B)
+    
+    B = df.groupby("method")["SSIM0"].apply(lambda x: np.mean([*x], axis=0))
+    print(B)
+
+    B = df.groupby("method")["PSNR"].apply(lambda x: np.mean([*x], axis=0))
+    print(B)
+    
+    B = df.groupby("method")["NRMSE"].apply(lambda x: np.mean([*x], axis=0))
+    print(B)
+    
 def save_images(df_return, out_dirs):
   
      if not os.path.exists(out_dirs):
@@ -65,39 +179,110 @@ def save_images(df_return, out_dirs):
         #print(row['std'])
        
    
-        f, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, sharey=True)
+        f, (ax1, ax2, ax4) = plt.subplots(1, 3, sharey=True)
     
         ax1.imshow(row['LDPT'])
-        ax1.set_title('LDPT')
+        ax1.set_title('LDPT' + ' SSIM = {0:.5f}'.format(row['SSIM0']))
         
         ax2.imshow(row['NDPT'])
         ax2.set_title('NDPT')
-                      #, SSIM ' + str(calc_ssim(row['LDPT'], row['NDPT'])))
         
-        ax3.imshow(row['std'])
-        ax3.set_title('std')
+        #ax3.imshow(row['std'])
+        #ax3.set_title('std')
         
         ax4.imshow(row['mean'])
-        ax4.set_title('mean')
-                      #', SSIM '+ str(calc_ssim(row['mean'], row['NDPT'])))
+        ax4.set_title('mean' + ' SSIM = {0:.5f}'.format(row['SSIM']))
 
         f.savefig(os.path.join(out_dirs, "img" + str(row['idx']) + ".jpg"))
         plt.close(f)
+
+def get_slice_ready(device, slice_, scale):
+    X = (1/scale)*slice_.astype(np.float32)
+    inputs = torch.tensor(X).unsqueeze(0).unsqueeze(0).to(device)
+    return(inputs)
+
+def if_no_dir_mkdir(path):
+    isExist = os.path.exists(path)
+
+    if not isExist:
+  
+  # Create a new directory because it does not exist 
+      os.makedirs(path)
+
+def pack_dcm(dcm_dir, out_dir, sub, dose):
+    slices = os.listdir(dcm_dir)
+    img = []
+    for slice_ in slices:
+        X = dcmread(os.path.join(dcm_dir, slice_))
+        img.append(X.pixel_array)
+    if len(sub)==26:
+        img_fin = np.swapaxes(np.array(img), 0, 2)
+    else:
+        img_fin=img
+    
+    print(np.array(img_fin).shape)
+    save_nift(np.array(img_fin), os.path.join(out_dir, sub), dose)
+
+def save_nift(numpy_array, data_path, dose):
+    if_no_dir_mkdir(data_path)
+    
+    ni_img = nib.Nifti1Image(numpy_array, affine=np.eye(4))
+    nib.save(ni_img, os.path.join(data_path, 'recon' + dose + '.nii.gz'))
     
 def dict_mean(df, i):
-    df_return = pd.DataFrame(columns=['LDPT', 'NDPT', 'idx', 'mean', 'std', 'ssim_0', 'ssim_net'])
-   
-    mean = df['NET'].to_numpy().mean(axis=0) 
+    #print(len(df))
+    df_return = pd.DataFrame(columns=['LDPT', 'NDPT', 'idx', 'mean', 'std', 'SSIM0', 'SSIM', 'PSNR', 'NRMSE'])
+    #print(df['NET'].values())
+    mean = df['NET'].to_numpy().mean(axis=0)
     std = df['NET'].to_numpy().std(axis=0)
-  
-    ssim_0 = ssim(stand_data(torch.tensor(df.iloc[0].LDPT)).numpy(), stand_data(torch.tensor(df.iloc[0].NDPT)).numpy())
-    ssim_net = ssim(stand_data(torch.tensor(mean)).numpy(), stand_data(torch.tensor(df.iloc[0].NDPT)).numpy())
-    data = {'LDPT': df.iloc[0].LDPT, 'NDPT': df.iloc[0].NDPT, 'idx':i, 'mean': mean, 'std':std, 'ssim_0':ssim_0, 'ssim_net':ssim_net}
-    df_return.loc[0] = data
-    
+    #print(std.shape)
+    #print(df_temp.iloc[0].LDPT.shape)
+    data = calc_res(df.iloc[0].LDPT, df.iloc[0].NDPT, mean, 0, 0, 0)
+
+    data_ = {'LDPT': df.iloc[0].LDPT, 'NDPT': df.iloc[0].NDPT, 'idx':i, 'mean': mean, 'std':std, 'SSIM0':data['SSIM0'], 'SSIM':data['SSIM'], 'PSNR':data['PSNR'], 'NRMSE':data['NRMSE']}
+    df_return.loc[0] = data_
+   
+        #print(ssim_by_iter)
     return df_return
 
-def train_test_net(trainloader_1, trainloader_2, network, N_finish, N, params, alpha, learn, method, optimizer, criterion, net, device, l, wd):
+def dict_mean_s(df, i):
+    
+    df_return = pd.DataFrame(columns=['LDPT', 'NDPT', 'idx', 'mean', 'std'])
+    
+    df_temp = df
+    mean = df_temp['NET'].to_numpy().mean(axis=0) 
+    std = df_temp['NET'].to_numpy().std(axis=0)
+  
+    data = {'LDPT': df_temp.iloc[0].LDPT, 'NDPT': df_temp.iloc[0].NDPT, 'idx':i, 'mean': mean, 'std':std}
+    df_return.loc[0] = data
+   
+    return df_return
+
+def calc_res(inputs, outputs, results, dose, epoch, i):
+    data = {'epoch':epoch, 'iter':i, 'Dose':dose, 'SSIM0': compute_ssim(outputs, inputs), 'SSIM':compute_ssim(outputs,results), 'PSNR':compute_psnr(outputs,results),'NRMSE':compute_nrmse(outputs,results)}
+   
+
+    return data
+
+def print_function(data_):
+    data = pd.DataFrame.from_dict(data_)
+    #print(data.Dose.unique())
+    #print("SSIM LDPT/NDPT")
+    #print(data)
+    display(data.groupby("Dose")["SSIM0"].apply(lambda x: np.mean([*x], axis=0)))
+    #print("SSIM NDPT/NET")
+    display(data.groupby("Dose")["SSIM"].apply(lambda x: np.mean([*x], axis=0)))
+    #print("PSNR")
+    display(data.groupby("Dose")["PSNR"].apply(lambda x: np.mean([*x], axis=0)))
+    #print("NRMSE")
+    display(data.groupby("Dose")["NRMSE"].apply(lambda x: np.mean([*x], axis=0)))
+    
+    in_ssim = np.median(data["SSIM0"].values)
+    res_ssim = np.median(data["SSIM"].values)
+
+    return in_ssim, res_ssim
+    
+def train_test_net(trainloader_1, trainloader_2, network, N_finish, N, params, alpha, learn, method, optimizer, criterion, net, device, l, wd, PATH):
    
     scheduler = ReduceLROnPlateau(optimizer, 'min')
     valid_in_ssim = []
@@ -106,23 +291,22 @@ def train_test_net(trainloader_1, trainloader_2, network, N_finish, N, params, a
     valid_loss = []
     train_loss = []
     
-    split = np.linspace(0, len(trainloader_1), int(len(trainloader_1)/428)+1)
+    split = np.linspace(0, len(trainloader_1), int(len(trainloader_1)/params['iter_size'])+1)
     split = split[1:]
-   
-    print(split)
+    #print(split)
+    
     for epoch in range(N):
         print('epoch ', epoch+1, ' out of ', N)
         i=0
+        print("SSIM range", params['SSIM_gate'] + 0.01*epoch)
         iterator=iter(trainloader_1)
         for spl in split:
-
+            SSIM_RESU_NDPT_train = pd.DataFrame(columns=['epoch', 'iter','Dose', 'SSIM0', 'SSIM','PSNR','NRMSE'])
+            k_t=0
+           
             running_train_loss = 0.0
             running_g_loss = 0.0
             running_l1_loss = 0.0
-            SSIM_LDPT_NDPT_train = []
-            SSIM_RESU_NDPT_train = []
-            SSIM_LDPT_NDPT_valid = []
-            SSIM_RESU_NDPT_valid = []
 							
             net.train()
             while(i<=int(spl)-1):
@@ -131,17 +315,13 @@ def train_test_net(trainloader_1, trainloader_2, network, N_finish, N, params, a
                 i=i+1
                 inputs = data_train['LDPT'].to(device)
                 outputs = data_train['NDPT'].to(device)
-            
                 optimizer.zero_grad()
                 results = net(inputs)
                 l1_train = torch.tensor(l[0])*criterion(results, outputs)
-                grad_train = torch.tensor(l[1])*criterion(gradient_magnitude(results), gradient_magnitude(outputs)) #+ torch.tensor(l[2])*criterion(laplacian_filter(results,3), laplacian_filter(outputs,3))
-                #print(scale_for_ssim(outputs).size())
-                #ssim_train = torch.tensor(l[3])*(1-ms_ssim(scale_for_ssim(results), scale_for_ssim(outputs), data_range=1, size_average=False).mean())
-                #print(ssim_train.item())
-                ssim_value = 1 - calc_ssim(results.detach().cpu(), outputs.detach().cpu())
-                if ssim_value > 0.05:
-                    loss_train = l1_train + grad_train #+ ssim_train
+                grad_train = torch.tensor(l[1])*criterion(gradient_magnitude(results), gradient_magnitude(outputs))
+                ssim_value = compute_ssim(results.squeeze(0).squeeze(0).detach().cpu().numpy(), outputs.squeeze(0).squeeze(0).detach().cpu().numpy())
+                if ssim_value < params['SSIM_gate'] + 0.01*epoch :
+                    loss_train = l1_train + grad_train
                     loss_train.backward()
                     optimizer.step()
                     if method == 'SGLD':
@@ -150,54 +330,67 @@ def train_test_net(trainloader_1, trainloader_2, network, N_finish, N, params, a
                     running_train_loss = running_train_loss + loss_train.item()
                     running_g_loss = running_g_loss + grad_train.item()
                     running_l1_loss = running_l1_loss + l1_train.item()
-                    SSIM_LDPT_NDPT_train.append(calc_ssim(inputs.detach().cpu(), outputs.detach().cpu()))
-                    SSIM_RESU_NDPT_train.append(calc_ssim(results.detach().cpu(), outputs.detach().cpu()))
-       
+                    
+                    if outputs.detach().cpu().max()!=0 and inputs.detach().cpu().max()!=0:
+                        SSIM_RESU_NDPT_train_data = calc_res(inputs.squeeze(0).squeeze(0).detach().cpu().numpy(), outputs.squeeze(0).squeeze(0).detach().cpu().numpy(), results.squeeze(0).squeeze(0).detach().cpu().numpy(), data_train['Dose'][0], epoch+1, i)
+                        SSIM_RESU_NDPT_train.loc[k_t] = SSIM_RESU_NDPT_train_data
+                        k_t=k_t+1
+
+            #[running_valid_loss, SSIM_RESU_NDPT_valid] = calc_valid_loss(criterion, l, device, trainloader_2, net, params['scale'], epoch,i)
+            SSIM_RESU_NDPT_valid = pd.DataFrame(columns=['epoch', 'iter','Dose', 'SSIM0', 'SSIM','PSNR','NRMSE'])
+	    
             running_valid_loss = 0.0
-    		
+            k_v=0
+    	
             with torch.no_grad():
                 net.eval()
                 for i_t, data_val in enumerate(trainloader_2, 0):
                     inputs = data_val['LDPT'].to(device)   
                     outputs = data_val['NDPT'].to(device)
                     results = net(inputs)
+     
                     l1_val = torch.tensor(l[0])*criterion(outputs, results)
-                    grad_val = torch.tensor(l[1])*criterion(gradient_magnitude(outputs), gradient_magnitude(results)) #+ torch.tensor(l[2])*criterion(laplacian_filter(results,5), laplacian_filter(outputs,5))
-                    #ssim_val = torch.tensor(l[3])*(1-ms_ssim(scale_for_ssim(results), scale_for_ssim(outputs), data_range=1, size_average=False).mean())
-                    loss_val = l1_val + grad_val 
+                    grad_val = torch.tensor(l[1])*criterion(gradient_magnitude(outputs), gradient_magnitude(results)) 
+                    
+                    loss_val = l1_val + grad_val
                         
                     								
                     running_valid_loss = running_valid_loss + loss_val.item()
-                    SSIM_LDPT_NDPT_valid.append(calc_ssim(inputs.detach().cpu(), outputs.detach().cpu()))
-                    SSIM_RESU_NDPT_valid.append(calc_ssim(results.detach().cpu(), outputs.detach().cpu()))
+                    if outputs.detach().cpu().max()!=0 and inputs.detach().cpu().max()!=0:
+                        SSIM_RESU_NDPT_valid_data = calc_res(inputs.squeeze(0).squeeze(0).detach().cpu().numpy(), outputs.squeeze(0).squeeze(0).detach().cpu().numpy(), results.squeeze(0).squeeze(0).detach().cpu().numpy(), data_val['Dose'][0], epoch+1, i)
+                        SSIM_RESU_NDPT_valid.loc[k_v] = SSIM_RESU_NDPT_valid_data
+                        k_v=k_v+1  
+                        
+            scheduler.step(running_valid_loss)	
+            print("learning rate = ", scheduler._last_lr)
+            print("train results:")
+            [train_in_ssim_, train_res_ssim_] = print_function(SSIM_RESU_NDPT_train)
+            print("valid results:")
+            [valid_in_ssim_, valid_res_ssim_] = print_function(SSIM_RESU_NDPT_valid)
+         
+            valid_in_ssim.append(valid_in_ssim_)
 			
-                scheduler.step(running_valid_loss)	
-                print("learning rate = ", scheduler._last_lr)	           
-                print("ssim valid LDPT/NDPT", np.mean(SSIM_LDPT_NDPT_valid))
-			
-                valid_in_ssim.append(np.mean(SSIM_LDPT_NDPT_valid))
-			
-                print("ssim valid results/NDPT", np.mean(SSIM_RESU_NDPT_valid))
-                valid_res_ssim.append(np.mean(SSIM_RESU_NDPT_valid))
-                print('[%d, %5d] training loss: %.5f' %
-                						  (epoch + 1, i, running_train_loss))
-                print('[%d, %5d] training grad loss: %.5f' %
-                						  (epoch + 1, i, running_g_loss))
-                print('[%d, %5d] training l1 loss: %.5f' %
-                						  (epoch + 1, i, running_l1_loss))
-                train_loss.append(running_train_loss)
-                print('[%d, %5d] validation loss: %.5f' %
-                						  (epoch + 1, i, running_valid_loss))
-             
+            valid_res_ssim.append(valid_res_ssim_)
             
-                valid_loss.append(running_valid_loss)
-               
-                if N - epoch <= N_finish:
-                    PATH_last_models = os.path.join('Experiments_fin', method, network + '_' + str(params['num_of_epochs']) + "_epochs_" + str(learn) + "_lr_" + str(l) + "grad_loss_lambda" + 'weight_decay' + str(wd), 'epoch_'+str(epoch+1)+'_iter_'+str(i))
-                    if not os.path.exists(PATH_last_models):
-                        os.makedirs(PATH_last_models)
-                    save_run(PATH_last_models, net, train_loss, valid_loss, valid_in_ssim, valid_res_ssim)
-                    load_model(epoch+1, PATH_last_models, trainloader_2)   
+            print('[%d, %5d] training loss: %.5f' %
+        						  (epoch + 1, i, running_train_loss))
+            print('[%d, %5d] training grad loss: %.5f' %
+        						  (epoch + 1, i, running_g_loss))
+            print('[%d, %5d] training l1 loss: %.5f' %
+        						  (epoch + 1, i, running_l1_loss))
+            train_loss.append(running_train_loss)
+            print('[%d, %5d] validation loss: %.5f' %
+        						  (epoch + 1, i, running_valid_loss))
+         
+        
+            valid_loss.append(running_valid_loss)
+           
+            if N - epoch <= N_finish:
+                PATH_last_models = os.path.join(PATH, method, network + '_' + str(params['num_of_epochs']) + "_epochs_" + 'SSIM_gate' + str(params['SSIM_gate']) + '_' + str(learn) + "_lr_" + str(l) + "grad_loss_lambda_" + 'weight_decay' + str(wd) + '_alpha' + str(alpha), '_epoch_'+str(epoch+1)+'_iter_'+str(i))
+                if not os.path.exists(PATH_last_models):
+                    os.makedirs(PATH_last_models)
+                save_run(PATH_last_models, net, train_loss, valid_loss, valid_in_ssim, valid_res_ssim)
+                load_model(epoch+1, PATH_last_models, trainloader_2)   
 			
                
     print('Finished Training')
@@ -293,7 +486,12 @@ def get_mat(name):
     X = dcmread(name)
     X = X.pixel_array
     return torch.tensor(X.astype(float))            
-    
+ 
+def get_mat_compare(name):
+    X = dcmread(name)
+    X = X.pixel_array
+    #print('yes')
+    return X.astype(float)     
 
 def transforma():
     transform = A.Compose([A.Flip(p=0.5)], additional_targets={'image0': 'image', 'image1': 'image'})
@@ -319,22 +517,34 @@ def export_pixel_array(in_file_LD, out_file_LD, in_file_FD, out_file_FD, dataset
     h5.close()
     
 
-def calc_valid_loss(criterion, l, data, device, trainloader_2):
+def calc_valid_loss(criterion, l, device, trainloader_2, net, scale, epoch,i):
+    SSIM_RESU_NDPT_valid = pd.DataFrame(columns=['epoch', 'iter','Dose', 'SSIM0', 'SSIM','PSNR','NRMSE'])
+	    
     running_valid_loss = 0.0
+    k_v=0
+    	
     with torch.no_grad():
-     
-        for i, data in enumerate(trainloader_2, 0):
-            
-            inputs = data['LDPT'].to(device)
-            outputs = data['NDPT'].to(device)
-            loss_ = torch.tensor(l[0])*criterion(outputs, inputs)
-            loss_grad = torch.tensor(l[1])*criterion(gradient_magnitude(outputs), gradient_magnitude(inputs))
-           
-           
-            loss_v = loss_ + loss_grad    
-            #print(loss_v.item())
-            running_valid_loss = running_valid_loss + loss_v.item()
-        return running_valid_loss
+        net.eval()
+        for i_t, data_val in enumerate(trainloader_2, 0):
+            inputs = data_val['LDPT'].to(device)   
+            outputs = data_val['NDPT'].to(device)
+            results = net(inputs)
+            #print(outputs.detach().cpu().max())
+            if outputs.detach().cpu().max()!=0:
+                #print('y')
+                l1_val = torch.tensor(l[0])*criterion(outputs, results)
+                grad_val = torch.tensor(l[1])*criterion(gradient_magnitude(outputs), gradient_magnitude(results)) 
+                
+                loss_val = l1_val + grad_val
+                    
+                								
+                running_valid_loss = running_valid_loss + loss_val.item()
+               
+                SSIM_RESU_NDPT_valid_data = calc_res(inputs.squeeze(0).squeeze(0).detach().cpu().numpy(), outputs.squeeze(0).squeeze(0).detach().cpu().numpy(), results.squeeze(0).squeeze(0).detach().cpu().numpy(), data_val['Dose'][0], epoch+1, i)
+                SSIM_RESU_NDPT_valid.loc[k_v] = SSIM_RESU_NDPT_valid_data
+                k_v=k_v+1
+        
+    return running_valid_loss, SSIM_RESU_NDPT_valid
 
 def gradient_magnitude(x):
     x_grad = kornia.filters.spatial_gradient(x, mode='diff', order=1)
@@ -428,11 +638,11 @@ def save_run(PATH, net, train_loss, valid_loss, valid_in_ssim, valid_res_ssim):
     save_list(valid_res_ssim, os.path.join(PATH, 'valid_res_ssim.pkl'))
     
 def test_ssim(LD, FD):
-    s = ssim(stand_data(get_mat(LD)).numpy(), stand_data(get_mat(FD)).numpy())
+    #s = ssim(stand_data(get_mat(LD)).numpy(), stand_data(get_mat(FD)).numpy())
     #print(s)
     #print(get_mat(LD).numpy().dtype)
-    if s>0.5 and s<1:
-        return 1
+    #if s>0.6 and s<1:
+    return 1
     
 def arrange_data(params, root_dir):
     
@@ -441,46 +651,43 @@ def arrange_data(params, root_dir):
 
     df = pd.DataFrame(columns=['sub_ID', 'slice', 'Dose', 'LDPT', 'HDPT'])
     i=0
-    for direct in root_dir:
-        sub = os.listdir(direct)
-        sub = [s for s in sub if s[-1] != 'p']       #remove zipped  
-        for sub_dir in sub:
-            sub_path = os.path.join(direct, sub_dir)
-            sub_sub_path = os.listdir(sub_path)
-            sub_sub_path = [s for s in sub_sub_path if s[-1] != 'X']       #remove zipped  
+    for sub_dir in glob(f"{root_dir}/*/"):
+        for scans in glob(f"{sub_dir}/*/"):
+            sub_ID = scans[-6:] #pt. ID
+            s_sub_path = os.path.join(sub_dir, scans)
+            d_scans = os.listdir(s_sub_path)    
+            #print(d_scans)
+            FD_scan = [d for d in d_scans if (d[-6:] == 'NORMAL' or d[-6:] == 'normal' or d == 'Full_dose' or d == 'FD')]
+            #print(FD_scan)
+            for FD in FD_scan:
+                FD_path = os.path.join(s_sub_path, FD)
+                for Dose in dose_list:
 
-            for scans in sub_sub_path:
-                sub_ID = scans[-6:] #pt. ID
-                s_sub_path = os.path.join(direct, sub_dir, scans)
-                d_scans = os.listdir(s_sub_path)
-                FD_scan = [d for d in d_scans if (d[-6:] == 'NORMAL' or d[-6:] == 'normal' or d == 'Full_dose' or d == 'FD')]
-                for FD in FD_scan:
-                    FD_path = os.path.join(s_sub_path, FD)
-                    for Dose in dose_list:
-
-                        LD_scan = [d for d in d_scans if Dose in d][0]
-                        LD_path = os.path.join(s_sub_path, LD_scan)
-                        slices = os.listdir(LD_path)
-                        #print(len(slices))
-                        for sl in slices:
-                            LD = os.path.join(LD_path, sl)
-                            FD = os.path.join(FD_path, sl)
-                            LD_to = os.path.join('/tcmldrive/users/Maya/ULDPT1/', str(Dose), "U"+sub_ID, "LD", sl[0:-4])
-                            HD_to = os.path.join('/tcmldrive/users/Maya/ULDPT1/', str(Dose), "U"+sub_ID, "FD", sl[0:-4])
-                            PATHS = [os.path.join('/tcmldrive/users/Maya/ULDPT1/', str(Dose), "U"+sub_ID, "LD"), os.path.join('/tcmldrive/users/Maya/ULDPT1/', str(Dose), "U"+sub_ID, "FD")]
-                            for PATH in PATHS:
-                                if not os.path.exists(PATH):
-                                    os.makedirs(PATH)
-                            if(test_ssim(LD, FD)==1):
-                                data = {'sub_ID': sub_ID, 'slice': sl, 'Dose': Dose, 'LDPT':LD_to, 'HDPT':HD_to}
-                                df.loc[i] = data
-                                i=i+1
-                                export_pixel_array(LD, LD_to, FD, HD_to, "dataset")
-                            else:
-                                print('fail')
-                            
-                            print(i)
-                        #slices = []
+                    LD_scan = [d for d in d_scans if Dose in d][0]
+                    LD_path = os.path.join(s_sub_path, LD_scan)
+                    slices = os.listdir(LD_path)
+                    print('LD', LD_path)
+                    print('FD', FD_path)
+                    #print(slices)
+                    for sl in slices:
+                        LD = os.path.join(LD_path, sl)
+                        FD = os.path.join(FD_path, sl)
+                        LD_to = os.path.join('/tcmldrive/users/Maya/ULDPT1/', str(Dose), "U"+sub_ID, "LD", sl[0:-4])
+                        HD_to = os.path.join('/tcmldrive/users/Maya/ULDPT1/', str(Dose), "U"+sub_ID, "FD", sl[0:-4])
+                        PATHS = [os.path.join('/tcmldrive/users/Maya/ULDPT1/', str(Dose), "U"+sub_ID, "LD"), os.path.join('/tcmldrive/users/Maya/ULDPT1/', str(Dose), "U"+sub_ID, "FD")]
+                        for PATH in PATHS:
+                            if not os.path.exists(PATH):
+                                os.makedirs(PATH)
+                        if(test_ssim(LD, FD)==1):
+                            data = {'sub_ID': sub_ID, 'slice': sl, 'Dose': Dose, 'LDPT':LD_to, 'HDPT':HD_to}
+                            df.loc[i] = data
+                            i=i+1
+                            export_pixel_array(LD, LD_to, FD, HD_to, "dataset")
+                        else:
+                            print('fail')
+                        
+                        #print(i)
+                    #slices = []
                         
     return df
   
@@ -565,8 +772,13 @@ def scale_data(data):
 
 def scale_for_ssim(data):
     if(torch.max(data)!=0):
-        data = (data-torch.min(data))/(torch.max(data)-torch.min(data))
+        data = data/torch.max(data)
     return data
+
+def compute_ssim(real, pred):
+    
+    ssim = compare_ssim(real/ float(np.max(real)), pred/ float(np.max(pred)))
+    return ssim
 
 def stand_data(data):
     
@@ -577,6 +789,46 @@ def stand_data(data):
     data = (data-torch.mean(data))/(std)
  
     return data
+def un_norm(data, data_or, scale):
+    
+    
+    #norm=torch.norm(torch.tensor(data_or), p='fro', dim=None, keepdim=False, out=None, dtype=None)
+    #if(norm==0):
+    #    norm=1
+    #m = torch.mean(torch.tensor(data_or))
+    #res_ = (torch.tensor(data)*norm + m).numpy()
+    res_ = data*scale
+    return res_
+
+def un_norm_old(data, data_or):
+    
+    
+    norm=torch.norm(torch.tensor(data_or), p='fro', dim=None, keepdim=False, out=None, dtype=None)
+    if(norm==0):
+        norm=1
+    m = torch.mean(torch.tensor(data_or))
+    res_ = (torch.tensor(data)*norm + m)
+    
+    return res_
+
+def compute_nrmse(real, pred):
+    if type(real).__module__ == np.__name__:
+        mse = np.mean(np.square(real - pred))
+        nrmse = np.sqrt(mse) / (np.max(real)-np.min(real))
+    else:
+        mse = np.mean(np.square(real.numpy() - pred.numpy()))
+        nrmse = np.sqrt(mse) / (np.max(real.numpy())-np.min(real.numpy()))
+    return nrmse
+
+def compute_mse(real, pred):
+    mse = np.mean(np.square(real-pred))
+    return mse
+
+
+def compute_psnr(real, pred):
+    PIXEL_MAX = np.max(real)
+    psnr = 20 * np.log10(PIXEL_MAX / np.sqrt(np.mean(np.square(real - pred))))
+    return psnr
 
 def norm_data(data):
     data = torch.tensor(data)
@@ -586,22 +838,9 @@ def norm_data(data):
     m = torch.mean(data)
     data = (data - m)/norm
     
-    return data.numpy()
+    return data
 
-def calc_ssim(LDPT, NDPT):
-    ssim_c = []
- 
-    s=LDPT.shape
-    for i in range(s[0]):
-        LD=LDPT[i][0]
-        ND=NDPT[i][0]
-        LDPT1 = stand_data(LD).numpy()
-        NDPT1 = stand_data(ND).numpy()
-                
-        ssim_=ssim(NDPT1, LDPT1)
-        ssim_c.append(ssim_)
-        
-    return sum(ssim_c)/len(ssim_c)
+
     
 
 def plot_result(PATH, i, results, inputs, outputs, ssim_LD_ND, ssim_RE_ND):
@@ -666,3 +905,40 @@ def load_model(N, PATH, trainloader_2):
                 plot_result(PATH, i, results, inputs, outputs, ssim(inputs.numpy(), outputs.numpy()), ssim(results.numpy(), outputs.numpy()))
         
         #print(median(std))
+def arrange_data_old(params, root_dir, scanner_type):
+    dose_list = params['dose_list']
+    chop = params['chop']
+    print(dose_list)
+    df = pd.DataFrame(columns=['sub_ID', 'slice', 'Dose', 'LDPT', 'HDPT'])
+    i=0
+    for sub_dir in glob(f"{root_dir}/*/"):
+        for scans in glob(f"{sub_dir}/*/"):
+            sub_ID = scans[-6:] #pt. ID
+            s_sub_path = os.path.join(sub_dir, scans)
+            d_scans = os.listdir(s_sub_path)
+            FD_scan = [d for d in d_scans if (d[-6:] == 'NORMAL' or d[-6:] == 'normal' or d == 'Full_dose' or d == 'FD')]
+            for FD in FD_scan:
+                FD_path = os.path.join(s_sub_path, FD)
+                for Dose in dose_list:
+                    #print('dose')
+                    LD_scan = [d for d in d_scans if Dose in d][0]
+                    LD_path = os.path.join(s_sub_path, LD_scan)
+                    slices = os.listdir(LD_path)
+                    for sl in slices:
+                        if scanner_type=='uExplorer':
+                            LD = os.path.join(LD_path, sl)
+                            FD = os.path.join(FD_path, sl)
+                        if scanner_type=='Siemense':
+                            ssl = sl.split('.')[3]
+                            LD = os.path.join(LD_path, sl)
+                            sl_FD = find_sl_FD(FD_path, ssl)
+                            FD = find_sl_FD(FD_path, ssl)
+                            FD = os.path.join(FD_path, sl_FD)
+                        data = {'sub_ID': sub_ID, 'slice': sl, 'Dose': Dose, 'LDPT':LD, 'HDPT':FD}
+                        df.loc[i] = data
+                        i=i+1
+                            
+                        print(i)
+                        #if i>50000*len(dose_list):
+                           #print('done')
+    return df
